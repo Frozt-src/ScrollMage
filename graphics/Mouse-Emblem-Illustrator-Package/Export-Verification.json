@@ -1,0 +1,30 @@
+{
+  "ReferenceSHA256": "CAE75BF0D34A43C788E94AF3407633D9160D6B2FB2270F0686F9942CA6D37813",
+  "ReferenceUnchanged": true,
+  "Exports": [
+    {
+      "Variant": "Light",
+      "VectorPaths": 5,
+      "RasterImages": 0,
+      "TextObjects": 0,
+      "EvenOddCompound": 1,
+      "Width": 2560,
+      "Height": 2560,
+      "EyeAlpha": 0,
+      "BodyAlpha": 255,
+      "BackgroundAlpha": 0
+    },
+    {
+      "Variant": "Ink",
+      "VectorPaths": 5,
+      "RasterImages": 0,
+      "TextObjects": 0,
+      "EvenOddCompound": 1,
+      "Width": 2560,
+      "Height": 2560,
+      "EyeAlpha": 0,
+      "BodyAlpha": 255,
+      "BackgroundAlpha": 0
+    }
+  ]
+}

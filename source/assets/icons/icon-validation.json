@@ -1,0 +1,31 @@
+{
+  "source_sha256": "06f7a0b3ce8426bd5943f0d7c5a68af5ddc793acdc2653a8eb3acfd1505d94a0",
+  "source_paths": 5,
+  "style": "Gunmetal continuous squircle, white existing mouse, left-facing to match the title logo",
+  "sizes": [
+    16,
+    20,
+    24,
+    28,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "tray_sizes": [
+    16,
+    20,
+    24,
+    28,
+    32,
+    40,
+    48,
+    64
+  ],
+  "small_cut": "Larger mark, far feet omitted for clarity",
+  "transparent_corners": true,
+  "new_third_party_dependencies": false
+}

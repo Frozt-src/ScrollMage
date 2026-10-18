@@ -1,0 +1,18 @@
+Illustrator 30.8.2
+Reopened from disk: Mouse-Emblem.ai
+Saved: true
+Layers:
+01 - MOUSE / editable master | visible=true | locked=false
+02 - BACKGROUND / optional charcoal | visible=true | locked=true
+03 - REFERENCE / embedded, hidden, locked | visible=false | locked=true
+Eye / leaf-shaped knockout | closed=true | anchors=3 | evenodd=true
+Body perimeter / near ear and legs | closed=true | anchors=19 | evenodd=true
+Tail / smooth inner and outer contours | closed=true | anchors=17 | evenodd=false
+Far ear / upper crescent | closed=true | anchors=5 | evenodd=false
+Far front foot / swept crescent | closed=true | anchors=4 | evenodd=false
+Far hind foot / crescent | closed=true | anchors=4 | evenodd=false
+Artwork paths: 6
+Artwork anchors: 52
+All artwork paths closed: true
+Compound paths: 1
+Embedded raster references: 1

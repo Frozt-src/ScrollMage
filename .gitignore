@@ -1,0 +1,27 @@
+# Local app state and installed shortcuts
+/settings.json
+/startup-error.txt
+*.lnk
+
+# Compiled builds, release uploads, and previous versions
+*.exe
+*.pdb
+/.updates/
+/dist/
+/source/target/
+/source/evidence/
+
+# Machine-specific build configuration
+/source/.cargo/config.toml
+
+# Local tools and credentials
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.key
+.DS_Store
+Thumbs.db
