@@ -68,7 +68,13 @@ impl Shell {
         Self::with_exclusions(w, h, 0)
     }
     pub fn with_exclusions(w: i32, h: i32, exclusions: usize) -> Self {
-        let rail = if w >= 1100 { 200 } else { 184 };
+        let rail = if w >= 1100 {
+            200
+        } else if w < 760 {
+            128
+        } else {
+            184
+        };
         Self {
             rail,
             body: Rect::new(rail + 24, 64, w - rail - 48, h - 148),

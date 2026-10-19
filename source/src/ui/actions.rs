@@ -43,15 +43,16 @@ impl Ui {
                 }
             }
         }
-        let opts = Settings {
+        let mut opts = Settings {
             preset: self.preset,
+            default_tuning: self.shared.settings.read().unwrap().default_tuning,
             distance: values[0],
             omega: values[1],
             acceleration_ms: values[2],
             acceleration_max: values[3],
             friction: values[4],
             elastic_omega: values[5],
-            profiles: Vec::new(),
+            profiles: self.shared.settings.read().unwrap().profiles.clone(),
             incompatible_processes: self
                 .shared
                 .settings
@@ -62,14 +63,20 @@ impl Ui {
             reverse: checked(self.reverse),
             exclusions: self.excluded_apps.clone(),
         };
+        if self.preset.fixed() {
+            opts.apply_preset(self.preset);
+        } else {
+            opts.default_tuning = Some(opts.tuning());
+        }
         if let Err(e) = settings::save(&self.path, &opts) {
             self.note = e;
             self.update();
             return;
         }
         if let Ok(mut s) = self.shared.settings.write() {
-            *s = opts;
+            *s = opts.clone();
         }
+        self.show_tuning(&opts);
         self.shared.refresh_target();
         let requested = checked(self.startup);
         self.note = if requested != startup_enabled() {

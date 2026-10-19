@@ -3,17 +3,48 @@ use crate::{
     settings::{Settings, WheelTuning},
 };
 
+// Software free-spin: fast consecutive notches launch a bounded exponential coast.
+// These are fixed Super smooth behavior, independent of the drag-preview friction.
+const FLICK_WINDOW_MS: f64 = 80.;
+const COAST_DECAY: f64 = 1.2;
+const COAST_MAX_SPEED: f64 = 18000.;
+const COAST_STOP_SPEED: f64 = 30.;
+const MAX_COAST_FRAME_SECONDS: f64 = 0.25;
+
 #[derive(Default)]
 struct Axis {
     spring: Spring,
     last_time: Option<f64>,
     last_input: Option<(f64, i32)>,
     omega: f64,
+    coast_velocity: f64,
 }
 impl Axis {
     fn advance(&mut self, now: f64) {
         if let Some(then) = self.last_time {
-            self.spring.step(((now - then) / 1000.).max(0.), self.omega);
+            let dt = ((now - then) / 1000.).max(0.);
+            if self.coast_velocity != 0. {
+                if dt > MAX_COAST_FRAME_SECONDS {
+                    // Do not dump missed momentum into an app after a worker stall.
+                    self.coast_velocity = 0.;
+                } else {
+                    let remaining =
+                        (self.coast_velocity.abs() / COAST_STOP_SPEED).ln() / COAST_DECAY;
+                    let elapsed = dt.min(remaining.max(0.));
+                    let travel =
+                        self.coast_velocity * -(-COAST_DECAY * elapsed).exp_m1() / COAST_DECAY;
+                    // Translating both coordinates leaves the finite impulse's exact
+                    // spring response intact, while coasting is frame-rate independent.
+                    self.spring.position += travel;
+                    self.spring.target += travel;
+                    self.coast_velocity = if dt >= remaining {
+                        0.
+                    } else {
+                        self.coast_velocity * (-COAST_DECAY * dt).exp()
+                    };
+                }
+            }
+            self.spring.step(dt, self.omega);
             if (self.spring.target - self.spring.position).abs() < 0.00001
                 && self.spring.velocity.abs() < 0.005
             {
@@ -24,7 +55,9 @@ impl Axis {
         self.last_time = Some(now);
     }
     fn active(&self) -> bool {
-        self.spring.position != self.spring.target || self.spring.velocity != 0.
+        self.coast_velocity != 0.
+            || self.spring.position != self.spring.target
+            || self.spring.velocity != 0.
     }
 }
 
@@ -72,6 +105,7 @@ impl Engine {
         let direction = delta.signum();
         if axis.last_input.is_some_and(|(_, d)| d != direction) {
             axis.spring = Spring::default();
+            axis.coast_velocity = 0.;
             axis.last_input = None;
         }
         let gain = axis.last_input.map_or(1., |(then, _)| {
@@ -88,6 +122,22 @@ impl Engine {
         }
         axis.spring.target += distance;
         axis.omega = s.omega;
+        if s.free_spin {
+            let interval = axis
+                .last_input
+                .and_then(|(then, _)| {
+                    let dt = now - then;
+                    (dt <= FLICK_WINDOW_MS).then_some(dt.max(8.))
+                })
+                .or_else(|| (delta.unsigned_abs() >= 240).then_some(40.));
+            if let Some(interval) = interval {
+                let speed = (s.distance * f64::from(delta).abs() / 120. * 1000. / interval * 1.5)
+                    .min(COAST_MAX_SPEED);
+                axis.coast_velocity = f64::from(direction) * axis.coast_velocity.abs().max(speed);
+            }
+        } else {
+            axis.coast_velocity = 0.;
+        }
         axis.last_input = Some((now, direction));
         true
     }

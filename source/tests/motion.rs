@@ -1,5 +1,5 @@
 use scrollpilot::motion::{momentum, rubber_band, GestureAxis, Spring};
-use scrollpilot::settings::{format_profiles, parse_profiles, Settings};
+use scrollpilot::settings::{format_profiles, parse_profiles, Preset, Settings};
 
 #[test]
 fn critical_follower_is_independent_of_frame_partition() {
@@ -100,9 +100,29 @@ fn profiles_override_only_the_selected_app_and_reject_ambiguity() {
         "a.exe | 1000 | 30",
         "a.exe | 120 | 30\nA.exe | off",
         "C:\\a.exe | off",
+        "C:a.exe | off",
+        "*.exe | off",
         "a.exe |",
         ".exe | off",
     ] {
         assert!(parse_profiles(input).is_err(), "{input}");
     }
+}
+
+#[test]
+fn fixed_profiles_roundtrip_with_preset_identity() {
+    let profiles = parse_profiles("Editor.exe | macos_style\nbrowser.exe | super_smooth").unwrap();
+    assert_eq!(profiles[0].preset, Some(Preset::MacosStyle));
+    assert_eq!(profiles[1].preset, Some(Preset::SuperSmooth));
+    let reparsed = parse_profiles(&format_profiles(&profiles)).unwrap();
+    assert_eq!(reparsed[0].preset, Some(Preset::MacosStyle));
+    assert_eq!(reparsed[1].preset, Some(Preset::SuperSmooth));
+    let s = Settings {
+        acceleration_ms: 300.,
+        acceleration_max: 4.,
+        profiles,
+        ..Settings::default()
+    };
+    assert_eq!(s.for_app("editor.exe").acceleration_max, 1.5);
+    assert_eq!(s.for_app("browser.exe").acceleration_max, 1.);
 }

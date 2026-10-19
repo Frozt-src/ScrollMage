@@ -1,4 +1,8 @@
-use scrollpilot::{engine::Engine, policy::intercept, settings::Settings};
+use scrollpilot::{
+    diagnostics::{Diagnostics, InputReason, Routing, TargetReason},
+    engine::Engine,
+    settings::Settings,
+};
 use std::{
     mem::{size_of, zeroed},
     ptr::null,
@@ -72,12 +76,13 @@ impl Drop for Handle {
         }
     }
 }
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub struct Target {
     pub hwnd: usize,
     pub eligible: bool,
     pub own: bool,
     pub tuning: scrollpilot::settings::WheelTuning,
+    pub routing: Routing,
 }
 pub struct Shared {
     pub settings: RwLock<Settings>,
@@ -97,6 +102,7 @@ pub struct Shared {
     pub ticks: AtomicU64,
     pub hook_max_us: AtomicU64,
     pub fault: Mutex<String>,
+    pub diagnostics: Diagnostics,
 }
 static SHARED: OnceLock<Arc<Shared>> = OnceLock::new();
 impl Shared {
@@ -112,6 +118,7 @@ impl Shared {
         self.enabled.store(false, Ordering::Release);
         if let Ok(mut e) = self.engine.lock() {
             e.clear();
+            self.diagnostics.invalidate();
         }
         self.notify();
         self.update_ui();
@@ -123,6 +130,24 @@ impl Shared {
                 PostMessageW(w as HWND, UPDATE, 0, 0);
             }
         }
+    }
+    fn update_input_ui(&self) {
+        if self.diagnostics.should_post_ui(self.now() as u64) {
+            self.update_ui();
+        }
+    }
+    pub fn status_text(&self) -> (String, String) {
+        let fault = self
+            .fault
+            .lock()
+            .map(|f| f.clone())
+            .unwrap_or_else(|_| "Engine state unavailable.".into());
+        self.diagnostics.status_text(
+            self.enabled.load(Ordering::Acquire),
+            self.hook_live.load(Ordering::Acquire),
+            &fault,
+            self.now() as u64,
+        )
     }
     pub fn fail(&self, reason: &str) {
         if let Ok(mut f) = self.fault.lock() {
@@ -141,53 +166,101 @@ impl Shared {
             {
                 self.fail("A configured competing scroll app is running (or cannot be checked). Pause it before enabling Scroll Mage.");
             }
-            let w = GetForegroundWindow();
+            // Process identity/integrity checks run on the UI refresh path, never
+            // in the low-level hook. Select the same root Windows will route to.
+            let routing = wheel_routing();
+            let mut point = zeroed();
+            let cursor_ok = GetCursorPos(&mut point) != 0;
+            let child = if cursor_ok {
+                WindowFromPoint(point)
+            } else {
+                std::ptr::null_mut()
+            };
+            let hovered = GetAncestor(child, GA_ROOT) as usize;
+            let foreground = GetForegroundWindow() as usize;
+            let w = routing.select(foreground, hovered).unwrap_or(0) as HWND;
             let mut pid = 0;
             GetWindowThreadProcessId(w, &mut pid);
             let own = pid == GetCurrentProcessId();
-            let mut eligible = !w.is_null();
-            let mut tuning = self.settings.read().map(|s| s.wheel()).unwrap_or_default();
-            if !own {
+            let opts = self.settings.read().ok();
+            let mut tuning = opts.as_ref().map(|s| s.wheel()).unwrap_or_default();
+            let mut app = String::new();
+            let mut reason = if routing == Routing::Unknown {
+                TargetReason::RoutingUnavailable
+            } else if !cursor_ok
+                || !routing.safe(w as usize, foreground, hovered)
+                || opts.is_none()
+                || (own && child as usize != self.pad.load(Ordering::Acquire))
+            {
+                TargetReason::NoTarget
+            } else {
+                TargetReason::Ready
+            };
+            if own {
+                app = "Scroll Test".into();
+            } else if reason == TargetReason::Ready {
                 let p = Handle(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) as usize);
                 if p.0 == 0 {
-                    eligible = false;
+                    reason = TargetReason::UnknownProcess;
                 } else {
                     let mut name = [0u16; 32768];
                     let mut len = name.len() as u32;
                     if QueryFullProcessImageNameW(p.raw(), 0, name.as_mut_ptr(), &mut len) == 0 {
-                        eligible = false;
+                        reason = TargetReason::UnknownProcess;
                     } else {
                         let path = String::from_utf16_lossy(&name[..len as usize]);
                         let base = path.rsplit('\\').next().unwrap_or("");
-                        eligible = self
-                            .settings
-                            .read()
-                            .map(|s| {
-                                tuning = s.for_app(base);
-                                !s.excluded(base)
-                            })
-                            .unwrap_or(false);
+                        app = base.into();
+                        if let Some(s) = opts.as_ref() {
+                            tuning = s.for_app(base);
+                            if s.excluded(base) {
+                                reason = TargetReason::Excluded;
+                            }
+                        }
                     }
-                    eligible &= match (integrity(p.raw()), integrity(GetCurrentProcess())) {
-                        (Some(t), Some(me)) => t <= me,
-                        _ => false,
-                    };
+                    if reason == TargetReason::Ready {
+                        reason = match (integrity(p.raw()), integrity(GetCurrentProcess())) {
+                            (Some(t), Some(me)) if t <= me => TargetReason::Ready,
+                            (Some(_), Some(_)) => TargetReason::HigherIntegrity,
+                            _ => TargetReason::UnknownIntegrity,
+                        };
+                    }
                 }
             }
-            if let Ok(mut target) = self.target.write() {
-                *target = Target {
-                    hwnd: w as usize,
-                    eligible,
-                    own,
-                    tuning,
-                };
-            }
+            drop(opts);
+            let next = Target {
+                hwnd: w as usize,
+                eligible: reason == TargetReason::Ready,
+                own,
+                tuning,
+                routing,
+            };
+            // Same lock order as the worker: publish a changed target only after
+            // any in-flight emission completes. Unchanged polls preserve tails.
             if let Ok(mut e) = self.engine.lock() {
-                e.clear();
+                if let Ok(mut target) = self.target.write() {
+                    if *target != next {
+                        e.clear();
+                        self.latch.store(0, Ordering::Release);
+                        self.diagnostics.invalidate();
+                        *target = next;
+                        self.notify();
+                    }
+                    self.diagnostics.set_target(app, reason);
+                }
             }
-            self.notify();
         }
     }
+}
+unsafe fn wheel_routing() -> Routing {
+    let mut value = 0u32;
+    let success = SystemParametersInfoW(
+        SPI_GETMOUSEWHEELROUTING,
+        0,
+        (&mut value as *mut u32).cast(),
+        0,
+    ) != 0;
+    Routing::from_raw(success.then_some(value))
 }
 unsafe fn integrity(process: HANDLE) -> Option<u32> {
     let mut t = std::ptr::null_mut();
@@ -233,7 +306,23 @@ unsafe fn under_cursor(target: Target, pad: usize, point: POINT) -> bool {
     if child.is_null() {
         return false;
     }
-    GetAncestor(child, GA_ROOT) as usize == target.hwnd && (!target.own || child as usize == pad)
+    target.routing.safe(
+        target.hwnd,
+        GetForegroundWindow() as usize,
+        GetAncestor(child, GA_ROOT) as usize,
+    ) && (!target.own || child as usize == pad)
+}
+unsafe fn emission_safe(s: &Shared, target: Target) -> bool {
+    let mut p = zeroed();
+    GetCursorPos(&mut p) != 0
+        && s.enabled.load(Ordering::Acquire)
+        && target.eligible
+        && wheel_routing() == target.routing
+        && under_cursor(target, s.pad.load(Ordering::Acquire), p)
+        && WindowFromPoint(p) as usize == s.latch.load(Ordering::Acquire)
+        && GetAsyncKeyState(VK_CONTROL as i32) >= 0
+        && GetAsyncKeyState(VK_MENU as i32) >= 0
+        && GetAsyncKeyState(VK_RBUTTON as i32) >= 0
 }
 unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isize {
     if code >= 0 && matches!(msg as u32, WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN) {
@@ -251,53 +340,73 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
     if let Some(s) = SHARED.get() {
         let began = Instant::now();
         let m = &*(data as *const MSLLHOOKSTRUCT);
+        // Emissions pass exactly once and are not external bypass observations.
+        if m.dwExtraInfo == TAG {
+            return CallNextHookEx(std::ptr::null_mut(), code, msg, data);
+        }
         let delta = ((m.mouseData >> 16) as u16 as i16) as i32;
-        let injected =
-            m.flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED) != 0 || m.dwExtraInfo == TAG;
+        let injected = m.flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED) != 0;
         let modified = GetAsyncKeyState(VK_CONTROL as i32) < 0
             || GetAsyncKeyState(VK_MENU as i32) < 0
             || GetAsyncKeyState(VK_RBUTTON as i32) < 0;
         let mut accepted = false;
-        if let (Ok(t), Ok(opts)) = (s.target.try_read(), s.settings.try_read()) {
-            let eligible = t.eligible
-                && GetForegroundWindow() as usize == t.hwnd
-                && under_cursor(*t, s.pad.load(Ordering::Acquire), m.pt);
-            if intercept(
-                delta,
-                injected,
-                modified,
-                eligible,
-                s.enabled.load(Ordering::Acquire),
-            ) {
-                let shift = GetAsyncKeyState(VK_SHIFT as i32) < 0;
-                let native_horizontal = msg == WM_MOUSEHWHEEL as usize;
-                if (!native_horizontal && !shift) || opts.horizontal {
-                    let horizontal = native_horizontal || shift;
-                    let mut amount = if shift && !native_horizontal {
-                        -delta
+        let mut reason = if injected {
+            InputReason::ExternalInjected
+        } else if modified {
+            InputReason::Modifiers
+        } else if delta == 0 || delta % 120 != 0 {
+            InputReason::Precision
+        } else if !s.enabled.load(Ordering::Acquire) {
+            InputReason::Disabled
+        } else {
+            InputReason::Busy
+        };
+        if reason == InputReason::Busy {
+            if let (Ok(t), Ok(opts)) = (s.target.try_read(), s.settings.try_read()) {
+                reason = if !t.eligible {
+                    InputReason::TargetUnavailable
+                } else if !under_cursor(*t, s.pad.load(Ordering::Acquire), m.pt) {
+                    InputReason::TargetChanged
+                } else {
+                    InputReason::Busy
+                };
+                if reason == InputReason::Busy {
+                    let shift = GetAsyncKeyState(VK_SHIFT as i32) < 0;
+                    let native_horizontal = msg == WM_MOUSEHWHEEL as usize;
+                    if (!native_horizontal && !shift) || opts.horizontal {
+                        let horizontal = native_horizontal || shift;
+                        let mut amount = if shift && !native_horizontal {
+                            -delta
+                        } else {
+                            delta
+                        };
+                        if opts.reverse {
+                            amount = -amount;
+                        }
+                        if let Ok(mut engine) = s.engine.try_lock() {
+                            if s.interrupted.swap(false, Ordering::AcqRel) {
+                                engine.clear();
+                            }
+                            let child = WindowFromPoint(m.pt) as usize;
+                            if s.latch.load(Ordering::Acquire) != child {
+                                engine.clear();
+                            }
+                            accepted =
+                                engine.push_tuned(s.now(), amount, horizontal, t.hwnd, t.tuning);
+                            if accepted {
+                                s.latch.store(child, Ordering::Release);
+                                reason = InputReason::Accepted;
+                            }
+                        }
                     } else {
-                        delta
-                    };
-                    if opts.reverse {
-                        amount = -amount;
-                    }
-                    if let Ok(mut engine) = s.engine.try_lock() {
-                        if s.interrupted.swap(false, Ordering::AcqRel) {
-                            engine.clear();
-                        }
-                        let child = WindowFromPoint(m.pt) as usize;
-                        if s.latch.load(Ordering::Acquire) != child {
-                            engine.clear();
-                        }
-                        accepted = engine.push_tuned(s.now(), amount, horizontal, t.hwnd, t.tuning);
-                        if accepted {
-                            s.latch.store(child, Ordering::Release);
-                        }
+                        reason = InputReason::HorizontalDisabled;
                     }
                 }
             }
         }
-        if !accepted && m.dwExtraInfo != TAG {
+        s.diagnostics.record_input(reason, s.now() as u64);
+        s.update_input_ui();
+        if !accepted {
             // Fine/OS-generated input, modifiers and bypasses interrupt our existing tail.
             if let Ok(mut engine) = s.engine.try_lock() {
                 engine.clear();
@@ -375,16 +484,7 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
             if let Ok(mut e) = s.engine.lock() {
                 // Read the latch only after input acceptance is serialized with this frame.
                 let target = s.target.read().map(|x| *x).unwrap_or_default();
-                let mut p = zeroed();
-                GetCursorPos(&mut p);
-                let safe = s.enabled.load(Ordering::Acquire)
-                    && target.eligible
-                    && GetForegroundWindow() as usize == target.hwnd
-                    && under_cursor(target, s.pad.load(Ordering::Acquire), p)
-                    && WindowFromPoint(p) as usize == s.latch.load(Ordering::Acquire)
-                    && GetAsyncKeyState(VK_CONTROL as i32) >= 0
-                    && GetAsyncKeyState(VK_MENU as i32) >= 0
-                    && GetAsyncKeyState(VK_RBUTTON as i32) >= 0;
+                let safe = emission_safe(&s, target);
                 if !safe || s.interrupted.swap(false, Ordering::AcqRel) {
                     e.clear();
                     active = false;
@@ -393,6 +493,13 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
                     active = e.active();
                     for (axis, delta) in values.into_iter().enumerate() {
                         if delta != 0 {
+                            // Recheck each axis: the first emission may cause an
+                            // app to change its window or the pointer may move.
+                            if !emission_safe(&s, target) {
+                                e.clear();
+                                active = false;
+                                break;
+                            }
                             if !send_wheel(delta, axis == 1) {
                                 e.clear();
                                 active = false;
@@ -404,6 +511,8 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
                                 break;
                             }
                             s.sent.fetch_add(1, Ordering::Relaxed);
+                            s.diagnostics.record_output(s.now() as u64);
+                            s.update_input_ui();
                         }
                     }
                 }
@@ -455,6 +564,7 @@ impl Runtime {
                 } else {
                     String::new()
                 }),
+                diagnostics: Diagnostics::default(),
             });
             SHARED
                 .set(s.clone())
@@ -707,10 +817,58 @@ mod tests {
                 ticks,
                 "Idle worker must stop scheduling frames."
             );
+            s.settings
+                .write()
+                .unwrap()
+                .select_preset(scrollpilot::settings::Preset::SuperSmooth);
+            s.refresh_target();
+            let coast_start = V.load(Ordering::Relaxed);
+            for _ in 0..3 {
+                accept_constructed(WM_MOUSEWHEEL, &m);
+                pump(Duration::from_millis(20));
+            }
+            pump(Duration::from_millis(300));
+            let coast_early = V.load(Ordering::Relaxed) - coast_start;
+            assert!(
+                coast_early > 360,
+                "Super smooth must generate fast sustained output"
+            );
+            let coast_checkpoint = V.load(Ordering::Relaxed);
+            pump(Duration::from_millis(1200));
+            let coast_late = V.load(Ordering::Relaxed) - coast_checkpoint;
+            assert!(
+                coast_late > 120,
+                "The live receiver must get momentum after physical input ends"
+            );
+            assert!(s.engine.lock().unwrap().active());
+            mouse_hook(0, WM_LBUTTONDOWN as usize, &m as *const _ as isize);
+            pump(Duration::from_millis(100));
+            assert!(
+                !s.engine.lock().unwrap().active(),
+                "A click must brake free-spin"
+            );
+            let clicked = V.load(Ordering::Relaxed);
+            pump(Duration::from_millis(150));
+            assert_eq!(
+                V.load(Ordering::Relaxed),
+                clicked,
+                "Click must cancel queued coast output"
+            );
+            for _ in 0..3 {
+                accept_constructed(WM_MOUSEWHEEL, &m);
+                pump(Duration::from_millis(20));
+            }
+            assert!(s.engine.lock().unwrap().active());
             s.pause();
+            pump(Duration::from_millis(100));
+            let paused = V.load(Ordering::Relaxed);
+            let paused_sent = s.sent.load(Ordering::Relaxed);
+            pump(Duration::from_millis(150));
+            assert_eq!(V.load(Ordering::Relaxed), paused);
+            assert_eq!(s.sent.load(Ordering::Relaxed), paused_sent);
             assert!(!s.enabled.load(Ordering::Acquire));
             assert!(!s.engine.lock().unwrap().active());
-            let result = serde_json::json!({"test":"owned Windows input receiver","vertical_smoothed_total":120,"horizontal_smoothed_total":120,"output_events":emitted,"received_events":EVENTS.load(Ordering::Relaxed),"hook_max_microseconds":s.hook_max_us.load(Ordering::Relaxed),"idle_frame_ticks_added":0,"hardware_input":"NOT RUN - hook entry used a constructed event; output used actual Windows SendInput and a live hook","injection_loop_prevention":"passed"});
+            let result = serde_json::json!({"test":"owned Windows input receiver","vertical_smoothed_total":120,"horizontal_smoothed_total":120,"output_events":emitted,"received_events":EVENTS.load(Ordering::Relaxed),"hook_max_microseconds":s.hook_max_us.load(Ordering::Relaxed),"idle_frame_ticks_added":0,"hardware_input":"NOT RUN - hook entry used constructed events; output used actual Windows SendInput and a live hook","injection_loop_prevention":"passed", "free_spin_early_units":coast_early,"free_spin_later_units":coast_late,"free_spin_click_brake":"passed","free_spin_pause_brake":"passed"});
             std::fs::write(
                 "target/native-verification.json",
                 serde_json::to_vec_pretty(&result).unwrap(),

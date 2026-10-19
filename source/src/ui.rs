@@ -6,8 +6,10 @@ mod exclusions;
 mod frame;
 mod presets;
 mod preview;
+mod profiles;
 mod startup;
 mod theme;
+mod tuning;
 use crate::native::{wide, Handle, Runtime, Shared, REFRESH, UPDATE};
 use presets::preset_combo;
 use scrollpilot::{
@@ -45,7 +47,9 @@ const TOGGLE: u16 = 102;
 const QUIT: u16 = 104;
 const STATUS_SWITCH: u16 = 110;
 const NAV_SETTINGS: u16 = 120;
+const NAV_PROFILES: u16 = 121;
 const NAV_ABOUT: u16 = 122;
+const NAV_ACTIVITY: u16 = 123;
 const EXCLUDE_ADD: u16 = 130;
 const PRESET: u16 = 135;
 const EXCLUSION_PANEL: u16 = 217;
@@ -95,6 +99,7 @@ struct Ui {
     view: u16,
     scroll: i32,
     ready: bool,
+    loading_controls: bool,
     wheel_total: i64,
     horizontal_total: i64,
     events: u64,
@@ -171,6 +176,7 @@ impl Ui {
             view: NAV_SETTINGS,
             scroll: 0,
             ready: false,
+            loading_controls: true,
             wheel_total: 0,
             horizontal_total: 0,
             events: 0,
@@ -242,7 +248,7 @@ impl Ui {
             "BUTTON",
             title,
             WS_TABSTOP
-                | if matches!(id, NAV_SETTINGS | NAV_ABOUT) {
+                | if matches!(id, NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT) {
                     BS_AUTORADIOBUTTON as u32 | if id == NAV_SETTINGS { WS_GROUP } else { 0 }
                 } else if checkable {
                     BS_AUTOCHECKBOX as u32
@@ -280,6 +286,8 @@ impl Ui {
         self.button("Maximize", WINDOW_MAXIMIZE, false, false);
         self.button("Close to tray", WINDOW_CLOSE, false, false);
         self.button("Settings", NAV_SETTINGS, false, false);
+        self.button("App profiles", NAV_PROFILES, false, false);
+        self.button("Activity", NAV_ACTIVITY, false, false);
         self.button("About", NAV_ABOUT, false, false);
         self.button("Apply settings", APPLY, false, false);
         self.toggle = self.button("Enable smoothing", TOGGLE, false, false);
@@ -419,8 +427,13 @@ impl Ui {
         self.shared.pad.store(self.pad, Ordering::Release);
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
-        self.static_text("Version 0.6.7\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
+        self.static_text("Version 0.6.9\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
+        self.build_profiles();
+        self.static_text("Scrolling activity", 3110, true, self.fonts.section);
+        self.static_text("", 3111, true, self.fonts.body);
         self.ready = true;
+        self.loading_controls = false;
+        self.sync_preset_controls();
         check(self.handle(NAV_SETTINGS), true);
         self.layout();
         self.update();
@@ -456,7 +469,10 @@ impl Ui {
             },
         );
         self.at(TITLE_LOGO, Rect::new(20, 4, 120, 40));
-        for (i, id) in [NAV_SETTINGS, NAV_ABOUT].into_iter().enumerate() {
+        for (i, id) in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT]
+            .into_iter()
+            .enumerate()
+        {
             self.at(id, Rect::new(16, 72 + i as i32 * 52, shell.rail - 32, 44));
         }
         self.at(TOGGLE, Rect::new(16, self.height - 66, shell.rail - 32, 40));
@@ -467,7 +483,19 @@ impl Ui {
         } else {
             ShowWindow(self.handle(APPLY) as HWND, SW_HIDE);
         }
-        self.at(904, Rect::new(x, action_y + 3, (w - 170).max(120), 38));
+        self.at(
+            904,
+            Rect::new(
+                x,
+                action_y + 3,
+                if self.view == NAV_SETTINGS {
+                    (w - 170).max(120)
+                } else {
+                    w
+                },
+                38,
+            ),
+        );
         MoveWindow(
             self.body as HWND,
             self.px(x),
@@ -483,6 +511,10 @@ impl Ui {
         }
         let content_h = if self.view == NAV_SETTINGS {
             shell.content_height()
+        } else if self.view == NAV_PROFILES {
+            720
+        } else if self.view == NAV_ACTIVITY {
+            520
         } else {
             shell.body.h
         };
@@ -567,6 +599,11 @@ impl Ui {
             let c = cards[3];
             self.at(216, Rect::new(c.x, c.y, c.w, c.h));
             self.at(RESET_PREVIEW, Rect::new(c.x + c.w - 99, c.y + 14, 79, 30));
+        } else if self.view == NAV_PROFILES {
+            self.layout_profiles();
+        } else if self.view == NAV_ACTIVITY {
+            self.at(3110, Rect::new(20, 20 - self.scroll, w - 40, 32));
+            self.at(3111, Rect::new(20, 70 - self.scroll, w - 40, 430));
         } else {
             self.at(1120, Rect::new(32, 30, w - 80, 46));
             self.at(
@@ -576,36 +613,16 @@ impl Ui {
         }
         InvalidateRect(self.hwnd as HWND, null(), 0);
         InvalidateRect(self.body as HWND, null(), 0);
-        for id in [NAV_SETTINGS, NAV_ABOUT] {
+        for id in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT] {
             InvalidateRect(self.handle(id) as HWND, null(), 0);
         }
     }
     unsafe fn update(&self) {
         let enabled = self.shared.enabled.load(Ordering::Acquire);
-        let fault = self
-            .shared
-            .fault
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_default();
-        set(
-            self.status_title,
-            if enabled {
-                "Smoothing is on"
-            } else {
-                "Smoothing is paused"
-            },
-        );
-        let copy = if !fault.is_empty() {
-            fault
-        } else if !self.note.is_empty() {
-            self.note.clone()
-        } else if enabled {
-            "Your wheel is smoothed. Excluded apps keep their own scrolling.".into()
-        } else {
-            "Your wheel is unchanged. Enable when ready.".into()
-        };
-        set(self.status, &copy);
+        let (title, copy) = self.shared.status_text();
+        set(self.status_title, &title);
+        set(self.status, copy.lines().next().unwrap_or(""));
+        set(self.handle(3111), &format!("{title}\r\n\r\n{copy}\r\n\r\nPoint at an app and scroll to see whether its input is accepted or passed through. Counters show this session's activity, not visible frame rate.\r\n\r\nFine-resolution and external injected input pass through. Other apps decide whether small wheel events produce pixel movement or line steps.\r\n\r\nSuper smooth adds a fast coast after a quick wheel flick. Reverse, click or pause to stop it. Momentum friction and elastic response belong to dragging in Scroll Test. Ordinary wheel output cannot read another app's content bounds or add elastic edges."));
         set(
             self.toggle,
             if enabled {
@@ -615,12 +632,13 @@ impl Ui {
             },
         );
         check(self.status_switch, enabled);
+        self.update_pending();
         InvalidateRect(self.hwnd as HWND, null(), 0);
         InvalidateRect(self.toggle as HWND, null(), 0);
     }
     unsafe fn navigate(&mut self, view: u16) {
         self.view = view;
-        for id in [NAV_SETTINGS, NAV_ABOUT] {
+        for id in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT] {
             check(self.handle(id), id == view);
         }
         self.scroll = 0;
@@ -631,6 +649,9 @@ impl Ui {
         SetFocus(self.handle(view) as HWND);
     }
     unsafe fn step(&mut self, id: u16) {
+        if self.preset.fixed() {
+            return;
+        }
         let index = ((id - 400) / 2) as usize;
         let (min, max) = [
             (1., 960.),
@@ -721,7 +742,7 @@ impl Ui {
             self.scale,
             self.fonts.small,
             MUTED,
-            "Version 0.6.7",
+            "Version 0.6.9",
             DT_SINGLELINE,
         );
     }
@@ -794,7 +815,7 @@ impl Ui {
                     BORDER
                 }),
             );
-        } else if self.view == NAV_ABOUT {
+        } else {
             round(
                 dc,
                 Rect::new(0, 0, shell.body.w, shell.body.h - 2),
@@ -941,7 +962,7 @@ impl Ui {
         GetClientRect(h, &mut client);
         let w = (f64::from(client.right) / self.scale).ceil() as i32;
         let height = (f64::from(client.bottom) / self.scale).ceil() as i32;
-        let is_nav = matches!(id, NAV_SETTINGS | NAV_ABOUT);
+        let is_nav = matches!(id, NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT);
         let in_body = self.controls.iter().any(|c| c.1 == h as usize && c.2);
         let bg = if is_nav || id == TOGGLE {
             RAIL
@@ -953,7 +974,15 @@ impl Ui {
         fill(dc, Rect::new(0, 0, w, height), self.scale, bg);
         let focused = GetFocus() == h;
         let pressed = SendMessageW(h, BM_GETSTATE, 0, 0) & BST_PUSHED as isize != 0;
-        let caption = text(h as usize);
+        let caption = if id == TOGGLE && w < 140 {
+            if self.shared.enabled.load(Ordering::Acquire) {
+                "Pause".into()
+            } else {
+                "Enable".into()
+            }
+        } else {
+            text(h as usize)
+        };
         let is_toggle = [212, 213, 214, STATUS_SWITCH].contains(&id);
         if [WINDOW_MINIMIZE, WINDOW_MAXIMIZE, WINDOW_CLOSE].contains(&id) {
             self.paint_caption_button(h, dc, id, w, height, pressed);
@@ -1054,18 +1083,25 @@ impl Ui {
             }
             let tint = if selected { ACCENT_TEXT } else { MUTED };
             let glyph = if id == NAV_SETTINGS { "⚙" } else { "☷" };
+            if w >= 140 {
+                label(
+                    dc,
+                    Rect::new(16, 0, 28, height),
+                    self.scale,
+                    self.fonts.section,
+                    tint,
+                    glyph,
+                    DT_SINGLELINE | DT_VCENTER | DT_CENTER,
+                );
+            }
             label(
                 dc,
-                Rect::new(16, 0, 28, height),
-                self.scale,
-                self.fonts.section,
-                tint,
-                glyph,
-                DT_SINGLELINE | DT_VCENTER | DT_CENTER,
-            );
-            label(
-                dc,
-                Rect::new(54, 0, w - 64, height),
+                Rect::new(
+                    if w >= 140 { 54 } else { 8 },
+                    0,
+                    w - if w >= 140 { 64 } else { 16 },
+                    height,
+                ),
                 self.scale,
                 self.fonts.body,
                 tint,
@@ -1293,6 +1329,22 @@ unsafe extern "system" fn button(
     _: usize,
     _: usize,
 ) -> isize {
+    if GetDlgCtrlID(h) as u16 == WINDOW_MAXIMIZE {
+        if msg == WM_NCHITTEST {
+            return HTMAXBUTTON as isize;
+        }
+        if matches!(
+            msg,
+            WM_NCMOUSEMOVE
+                | WM_NCMOUSELEAVE
+                | WM_NCLBUTTONDOWN
+                | WM_NCLBUTTONUP
+                | WM_NCLBUTTONDBLCLK
+        ) {
+            InvalidateRect(h, null(), 0);
+            return SendMessageW(GetAncestor(h, GA_ROOT), msg, w, l);
+        }
+    }
     let ptr = state(h);
     if ptr.is_null() {
         return DefSubclassProc(h, msg, w, l);
@@ -1353,6 +1405,11 @@ unsafe extern "system" fn button(
     result
 }
 unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
+    if msg == WM_CTLCOLORLISTBOX {
+        SetTextColor(w as HDC, color(INK));
+        SetBkColor(w as HDC, color(WHITE));
+        return Some(ui.brush as isize);
+    }
     if msg == WM_CTLCOLOREDIT {
         SetTextColor(w as HDC, color(INK));
         SetBkColor(w as HDC, color(WHITE));
@@ -1520,6 +1577,13 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             ui.toggle_time = now;
             0
         }
+        WM_TIMER if w == 7 => {
+            ui.shared.refresh_target();
+            if IsWindowVisible(h) != 0 && IsIconic(h) == 0 {
+                ui.update();
+            }
+            0
+        }
         WM_TIMER if w == 5 => {
             if IsWindowVisible(h) == 0 || IsIconic(h) != 0 {
                 ui.logo_timer(false);
@@ -1534,8 +1598,8 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
         WM_GETMINMAXINFO => {
             let m = &mut *(l as *mut MINMAXINFO);
             m.ptMinTrackSize = POINT {
-                x: ui.px(940),
-                y: ui.px(680),
+                x: ui.px(500),
+                y: ui.px(420),
             };
             0
         }
@@ -1559,6 +1623,20 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                     ui.fonts.body
                 };
                 SendMessageW(control as HWND, WM_SETFONT, font, 1);
+            }
+            for (id, row_height) in [(PRESET, 32), (3003, 28)] {
+                SendMessageW(
+                    ui.handle(id) as HWND,
+                    CB_SETITEMHEIGHT,
+                    0,
+                    ui.px(row_height) as isize,
+                );
+                SendMessageW(
+                    ui.handle(id) as HWND,
+                    CB_SETITEMHEIGHT,
+                    usize::MAX,
+                    ui.px(28) as isize,
+                );
             }
             drop(old_fonts);
             let r = &*(l as *const RECT);
@@ -1591,17 +1669,39 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             ui.draw_preset_item(&*(l as *const DRAWITEMSTRUCT));
             1
         }
+        WM_DRAWITEM if w == 3003 => {
+            ui.draw_app_profile_item(&*(l as *const DRAWITEMSTRUCT));
+            1
+        }
+        WM_MEASUREITEM if w == 3003 => {
+            (*(l as *mut MEASUREITEMSTRUCT)).itemHeight = ui.px(28) as u32;
+            1
+        }
         WM_MEASUREITEM if w == PRESET as usize => {
             (*(l as *mut MEASUREITEMSTRUCT)).itemHeight = ui.px(32) as u32;
             1
         }
         WM_COMMAND => {
             let id = (w & 0xffff) as u16;
+            if ui.profile_command(id, (w >> 16) as u32) {
+                return 0;
+            }
+            if (201..207).contains(&id) && (w >> 16) as u32 == EN_CHANGE {
+                if ui.ready && !ui.loading_controls {
+                    ui.note.clear();
+                    ui.update_pending();
+                }
+                return 0;
+            }
             if id != PRESET && (w >> 16) as u32 != BN_CLICKED {
                 return 0;
             }
             match id {
-                212..=214 => ui.sync_toggles(),
+                212..=214 => {
+                    ui.note.clear();
+                    ui.sync_toggles();
+                    ui.update_pending();
+                }
                 APPLY => ui.apply(),
                 PRESET if (w >> 16) as u32 == CBN_DROPDOWN => {
                     presets::style_popup(ui.handle(PRESET) as HWND, ui.scale);
@@ -1619,7 +1719,9 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                     ui.select_preset()
                 }
                 TOGGLE | STATUS_SWITCH => ui.toggle(),
-                NAV_SETTINGS | NAV_ABOUT => ui.navigate((w & 0xffff) as u16),
+                NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT => {
+                    ui.navigate((w & 0xffff) as u16)
+                }
                 EXCLUDE_ADD => ui.add_exclusion(),
                 id if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) && id % 2 == 1 => {
                     PostMessageW(
@@ -1861,6 +1963,11 @@ pub fn run(runtime: &Runtime, path: PathBuf, note: String, tray: bool) -> Result
                 .fail("App monitoring failed. Smoothing is paused. Restart to retry.");
         }
         runtime.shared.refresh_target();
+        if SetTimer(h, 7, 250, None) == 0 {
+            runtime
+                .shared
+                .fail("App monitoring timer failed. Restart to retry.");
+        }
         let mut msg = zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
             if IsDialogMessageW(h, &msg) == 0 {

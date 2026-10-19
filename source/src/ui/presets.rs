@@ -7,19 +7,22 @@ impl Ui {
             return;
         };
         let mut settings = self.shared.settings.read().unwrap().clone();
-        settings.apply_preset(preset);
-        self.preset = preset;
-        for (input, value) in self.inputs.into_iter().zip([
-            settings.distance,
-            settings.omega,
-            settings.acceleration_ms,
-            settings.acceleration_max,
-            settings.friction,
-            settings.elastic_omega,
-        ]) {
-            set(input, &value.to_string());
+        settings.select_preset(preset);
+        if let Err(error) = settings::save(&self.path, &settings) {
+            SendMessageW(
+                self.handle(PRESET) as HWND,
+                CB_SETCURSEL,
+                self.preset as usize,
+                0,
+            );
+            self.note = format!("Preset not changed: {error}");
+            self.update();
+            return;
         }
-        self.note = format!("{} selected. Apply settings to use it.", preset.label());
+        *self.shared.settings.write().unwrap() = settings.clone();
+        self.shared.refresh_target();
+        self.show_tuning(&settings);
+        self.note = format!("{} saved and active.", preset.label());
         self.update();
         InvalidateRect(self.handle(PRESET) as HWND, null(), 0);
     }
@@ -233,7 +236,13 @@ pub(super) unsafe extern "system" fn preset_combo(
         return DefSubclassProc(h, msg, w, l);
     }
     let ui = &*ptr;
-    let paint = |dc: HDC, width: i32, height: i32| ui.paint_preset(h, dc, width, height);
+    let paint = |dc: HDC, width: i32, height: i32| {
+        if GetDlgCtrlID(h) == 3003 {
+            ui.paint_app_profile_combo(h, dc, width, height);
+        } else {
+            ui.paint_preset(h, dc, width, height);
+        }
+    };
     match msg {
         WM_PAINT => {
             buffered(h, paint);

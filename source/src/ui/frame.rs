@@ -25,6 +25,20 @@ impl Ui {
                 Some(0)
             }
             WM_NCHITTEST => {
+                let maximize = self.handle(WINDOW_MAXIMIZE) as HWND;
+                if !maximize.is_null() {
+                    let mut bounds: RECT = zeroed();
+                    GetWindowRect(maximize, &mut bounds);
+                    let px = (l as u16 as i16) as i32;
+                    let py = ((l >> 16) as u16 as i16) as i32;
+                    if px >= bounds.left
+                        && px < bounds.right
+                        && py >= bounds.top
+                        && py < bounds.bottom
+                    {
+                        return Some(HTMAXBUTTON as isize);
+                    }
+                }
                 let mut rect = zeroed();
                 GetWindowRect(h, &mut rect);
                 let x = (l as u16 as i16) as i32 - rect.left;

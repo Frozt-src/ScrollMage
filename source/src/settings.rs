@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct Settings {
     pub preset: Preset,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_tuning: Option<Tuning>,
     pub distance: f64,
     pub omega: f64,
     pub acceleration_ms: f64,
@@ -26,6 +28,26 @@ pub enum Preset {
 }
 impl Preset {
     pub const ALL: [Self; 3] = [Self::Default, Self::MacosStyle, Self::SuperSmooth];
+    pub fn fixed(self) -> bool {
+        self != Self::Default
+    }
+    /// Canonical values for this preset; Default can be edited in Settings.
+    pub fn tuning(self) -> Tuning {
+        let [distance, omega, acceleration_ms, acceleration_max, friction, elastic_omega] =
+            match self {
+                Self::Default => [120., 30., 70., 1., 4., 22.],
+                Self::MacosStyle => [120., 24., 100., 1.5, 4.5, 24.],
+                Self::SuperSmooth => [120., 18., 100., 1., 5., 20.],
+            };
+        Tuning {
+            distance,
+            omega,
+            acceleration_ms,
+            acceleration_max,
+            friction,
+            elastic_omega,
+        }
+    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Default => "Default",
@@ -33,26 +55,71 @@ impl Preset {
             Self::SuperSmooth => "Super smooth",
         }
     }
+    fn wheel(self) -> WheelTuning {
+        WheelTuning {
+            free_spin: self == Self::SuperSmooth,
+            ..self.tuning().wheel()
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Tuning {
+    pub distance: f64,
+    pub omega: f64,
+    pub acceleration_ms: f64,
+    pub acceleration_max: f64,
+    pub friction: f64,
+    pub elastic_omega: f64,
+}
+impl Tuning {
+    fn validate(self) -> Result<(), String> {
+        for (label, value, min, max) in [
+            ("Distance", self.distance, 1., 960.),
+            ("Spring response", self.omega, 10., 80.),
+            ("Acceleration window", self.acceleration_ms, 10., 500.),
+            ("Maximum acceleration", self.acceleration_max, 1., 10.),
+            ("Preview friction", self.friction, 1., 12.),
+            ("Elastic response", self.elastic_omega, 10., 50.),
+        ] {
+            if !value.is_finite() || value < min || value > max {
+                return Err(format!("{label} must be between {min} and {max}."));
+            }
+        }
+        Ok(())
+    }
+    fn wheel(self) -> WheelTuning {
+        WheelTuning {
+            distance: self.distance,
+            omega: self.omega,
+            acceleration_ms: self.acceleration_ms,
+            acceleration_max: self.acceleration_max,
+            free_spin: false,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
     pub executable: String,
+    #[serde(default)]
+    pub preset: Option<Preset>,
     pub distance: f64,
     pub omega: f64,
     #[serde(default)]
     pub bypass: bool,
 }
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct WheelTuning {
     pub distance: f64,
     pub omega: f64,
     pub acceleration_ms: f64,
     pub acceleration_max: f64,
+    pub free_spin: bool,
 }
 impl Default for Settings {
     fn default() -> Self {
         Self {
             preset: Preset::Default,
+            default_tuning: None,
             distance: 120.,
             omega: 30.,
             acceleration_ms: 70.,
@@ -71,50 +138,64 @@ impl Default for Settings {
     }
 }
 impl Settings {
+    pub fn tuning(&self) -> Tuning {
+        Tuning {
+            distance: self.distance,
+            omega: self.omega,
+            acceleration_ms: self.acceleration_ms,
+            acceleration_max: self.acceleration_max,
+            friction: self.friction,
+            elastic_omega: self.elastic_omega,
+        }
+    }
+    fn set_tuning(&mut self, tuning: Tuning) {
+        self.distance = tuning.distance;
+        self.omega = tuning.omega;
+        self.acceleration_ms = tuning.acceleration_ms;
+        self.acceleration_max = tuning.acceleration_max;
+        self.friction = tuning.friction;
+        self.elastic_omega = tuning.elastic_omega;
+    }
+    /// Remember the editable Default while switching between fixed presets.
+    pub fn select_preset(&mut self, preset: Preset) {
+        if self.preset == Preset::Default {
+            if preset == Preset::Default {
+                return;
+            }
+            self.default_tuning = Some(self.tuning());
+        }
+        self.preset = preset;
+        self.set_tuning(if preset.fixed() {
+            preset.tuning()
+        } else {
+            self.default_tuning.unwrap_or_else(|| preset.tuning())
+        });
+    }
     /// Our Windows wheel tuning, not Apple's private scrolling constants.
-    /// A slower critical spring spreads each notch across smaller output steps.
     /// Friction and elastic response affect the owned test surface only.
     pub fn apply_preset(&mut self, preset: Preset) {
-        let values = match preset {
-            Preset::Default => [120., 30., 70., 1., 4., 22.],
-            Preset::MacosStyle => [120., 24., 100., 1.5, 4.5, 24.],
-            Preset::SuperSmooth => [120., 18., 100., 1., 5., 20.],
-        };
-        self.preset = preset;
-        [
-            self.distance,
-            self.omega,
-            self.acceleration_ms,
-            self.acceleration_max,
-            self.friction,
-            self.elastic_omega,
-        ] = values;
+        self.select_preset(preset);
     }
-    /// Preserve legacy bypass choices as visible exclusions; use global tuning.
+    /// Normalize legacy preset values without discarding per-app overrides.
     pub fn migrate_profiles(&mut self) {
-        for profile in self.profiles.drain(..) {
-            if profile.bypass
-                && !self
-                    .exclusions
-                    .iter()
-                    .any(|name| name.eq_ignore_ascii_case(&profile.executable))
-            {
-                self.exclusions.push(profile.executable);
+        if self.preset.fixed() {
+            let canonical = self.preset.tuning();
+            if self.default_tuning.is_none() && self.tuning() != canonical {
+                self.default_tuning = Some(self.tuning());
+            }
+            self.set_tuning(canonical);
+        }
+        for profile in &mut self.profiles {
+            if let Some(preset) = profile.preset.filter(|preset| preset.fixed()) {
+                profile.distance = preset.tuning().distance;
+                profile.omega = preset.tuning().omega;
             }
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        for (label, value, min, max) in [
-            ("Distance", self.distance, 1., 960.),
-            ("Spring response", self.omega, 10., 80.),
-            ("Acceleration window", self.acceleration_ms, 10., 500.),
-            ("Maximum acceleration", self.acceleration_max, 1., 10.),
-            ("Preview friction", self.friction, 1., 12.),
-            ("Elastic response", self.elastic_omega, 10., 50.),
-        ] {
-            if !value.is_finite() || value < min || value > max {
-                return Err(format!("{label} must be between {min} and {max}."));
-            }
+        self.tuning().validate()?;
+        if let Some(tuning) = self.default_tuning {
+            tuning.validate()?;
         }
         if self.exclusions.len() > 128
             || self.incompatible_processes.len() > 128
@@ -158,11 +239,10 @@ impl Settings {
                 .any(|p| p.bypass && p.executable.eq_ignore_ascii_case(name))
     }
     pub fn wheel(&self) -> WheelTuning {
-        WheelTuning {
-            distance: self.distance,
-            omega: self.omega,
-            acceleration_ms: self.acceleration_ms,
-            acceleration_max: self.acceleration_max,
+        if self.preset.fixed() {
+            self.preset.wheel()
+        } else {
+            self.tuning().wheel()
         }
     }
     pub fn for_app(&self, name: &str) -> WheelTuning {
@@ -170,10 +250,14 @@ impl Settings {
         if let Some(p) = self
             .profiles
             .iter()
-            .find(|p| p.executable.eq_ignore_ascii_case(name))
+            .find(|p| !p.bypass && p.executable.eq_ignore_ascii_case(name))
         {
+            if let Some(preset) = p.preset.filter(|preset| preset.fixed()) {
+                return preset.wheel();
+            }
             tuning.distance = p.distance;
             tuning.omega = p.omega;
+            tuning.free_spin = false;
         }
         tuning
     }
@@ -182,7 +266,8 @@ fn valid_executable(name: &str) -> bool {
     name.len() > 4
         && name.len() <= 260
         && name.to_ascii_lowercase().ends_with(".exe")
-        && !name.contains(['\\', '/', '\0', '\r', '\n', '|'])
+        && !name.contains(['\\', '/', ':', '*', '?', '"', '<', '>', '|'])
+        && !name.chars().any(char::is_control)
 }
 pub fn parse_profiles(text: &str) -> Result<Vec<Profile>, String> {
     let mut profiles = Vec::new();
@@ -191,12 +276,29 @@ pub fn parse_profiles(text: &str) -> Result<Vec<Profile>, String> {
         let p = match parts.as_slice() {
             [name, "off"] => Profile {
                 executable: (*name).into(),
+                preset: None,
                 distance: 120.,
                 omega: 30.,
                 bypass: true,
             },
+            [name, preset @ ("macos_style" | "super_smooth")] => {
+                let preset = if *preset == "macos_style" {
+                    Preset::MacosStyle
+                } else {
+                    Preset::SuperSmooth
+                };
+                let tuning = preset.tuning();
+                Profile {
+                    executable: (*name).into(),
+                    preset: Some(preset),
+                    distance: tuning.distance,
+                    omega: tuning.omega,
+                    bypass: false,
+                }
+            }
             [name, distance, omega] => Profile {
                 executable: (*name).into(),
+                preset: None,
                 distance: distance
                     .parse()
                     .map_err(|_| "Profile distance must be a number.")?,
@@ -205,7 +307,7 @@ pub fn parse_profiles(text: &str) -> Result<Vec<Profile>, String> {
                     .map_err(|_| "Profile response must be a number.")?,
                 bypass: false,
             },
-            _ => return Err("Profiles: app.exe | distance | response, or app.exe | off".into()),
+            _ => return Err("Profiles: app.exe | distance | response, app.exe | macos_style, app.exe | super_smooth, or app.exe | off".into()),
         };
         profiles.push(p);
     }
@@ -222,6 +324,13 @@ pub fn format_profiles(profiles: &[Profile]) -> String {
         .map(|p| {
             if p.bypass {
                 format!("{} | off", p.executable)
+            } else if let Some(preset) = p.preset.filter(|preset| preset.fixed()) {
+                let name = match preset {
+                    Preset::MacosStyle => "macos_style",
+                    Preset::SuperSmooth => "super_smooth",
+                    Preset::Default => unreachable!(),
+                };
+                format!("{} | {}", p.executable, name)
             } else {
                 format!("{} | {} | {}", p.executable, p.distance, p.omega)
             }
@@ -251,9 +360,12 @@ pub fn load(path: &std::path::Path) -> Result<Settings, String> {
 pub fn save(path: &std::path::Path, settings: &Settings) -> Result<(), String> {
     use std::io::Write;
     settings.validate()?;
+    let mut normalized = settings.clone();
+    normalized.migrate_profiles();
+    normalized.validate()?;
     let temp = path.with_extension(format!("{}.tmp", std::process::id()));
     let mut f = std::fs::File::create(&temp).map_err(|e| e.to_string())?;
-    let bytes = serde_json::to_vec_pretty(settings).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec_pretty(&normalized).map_err(|e| e.to_string())?;
     f.write_all(&bytes)
         .and_then(|_| f.sync_all())
         .map_err(|e| e.to_string())?;

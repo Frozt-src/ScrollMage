@@ -4,6 +4,7 @@ pub mod brand_lockup;
 pub mod brand_render;
 pub mod branding;
 pub mod control_motion;
+pub mod diagnostics;
 pub mod engine;
 #[cfg(windows)]
 pub mod frame_style;

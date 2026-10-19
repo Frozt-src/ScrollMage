@@ -2,6 +2,328 @@
 use super::*;
 use std::sync::{atomic::*, Mutex, RwLock};
 
+#[test]
+fn hidden_native_preset_rows_follow_live_dpi_changes() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let ui = hidden(1.);
+        let mut rect: RECT = zeroed();
+        GetWindowRect(ui.hwnd as HWND, &mut rect);
+        SendMessageW(
+            ui.hwnd as HWND,
+            WM_DPICHANGED,
+            192 | (192 << 16),
+            (&rect as *const RECT) as isize,
+        );
+        assert_eq!(
+            SendMessageW(ui.handle(3003) as HWND, CB_GETITEMHEIGHT, usize::MAX, 0),
+            56
+        );
+        assert_eq!(
+            SendMessageW(ui.handle(3003) as HWND, CB_GETITEMHEIGHT, 0, 0),
+            56
+        );
+        assert_eq!(
+            SendMessageW(ui.handle(PRESET) as HWND, CB_GETITEMHEIGHT, usize::MAX, 0),
+            56
+        );
+        assert_eq!(
+            SendMessageW(ui.handle(PRESET) as HWND, CB_GETITEMHEIGHT, 0, 0),
+            64
+        );
+        assert_eq!(IsWindowVisible(ui.hwnd as HWND), 0);
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
+#[test]
+fn hidden_native_profile_errors_preserve_saved_and_active_settings() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let mut ui = hidden(1.);
+        set(ui.handle(3002), "Editor.exe");
+        set(ui.handle(3004), "72");
+        set(ui.handle(3005), "35");
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
+        let good_path = ui.path.clone();
+        let original = std::fs::read(&good_path).unwrap();
+        set(ui.handle(3004), "0");
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
+        assert_eq!(std::fs::read(&good_path).unwrap(), original);
+        assert_eq!(
+            ui.shared
+                .settings
+                .read()
+                .unwrap()
+                .for_app("Editor.exe")
+                .distance,
+            72.
+        );
+        set(ui.handle(3004), "80");
+        ui.path = good_path.join("missing/settings.json");
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3007, 0);
+        assert_eq!(ui.shared.settings.read().unwrap().profiles.len(), 1);
+        assert_eq!(std::fs::read(&good_path).unwrap(), original);
+        std::fs::remove_file(good_path).unwrap();
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
+#[test]
+fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        for scale in [1., 1.25, 1.5, 1.75, 2.] {
+            for width in [500, 940, 1140] {
+                let mut ui = hidden(scale);
+                let hwnd = ui.hwnd as HWND;
+                SetWindowPos(
+                    hwnd,
+                    null_mut(),
+                    0,
+                    0,
+                    ui.px(width),
+                    ui.px(768),
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+                ui.layout();
+                set(ui.handle(3002), "Editor.exe");
+                SendMessageW(hwnd, WM_COMMAND, 3006, 0);
+                for (page, name) in [(NAV_PROFILES, "app-profiles"), (NAV_ACTIVITY, "activity")] {
+                    ui.navigate(page);
+                    let surface = Surface::new(ui.px(ui.width), ui.px(ui.height));
+                    ui.paint_main(surface.dc);
+                    let saved = SaveDC(surface.dc);
+                    SetViewportOrgEx(
+                        surface.dc,
+                        ui.px(ui.shell().body.x),
+                        ui.px(ui.shell().body.y),
+                        null_mut(),
+                    );
+                    ui.paint_body(surface.dc);
+                    RestoreDC(surface.dc, saved);
+                    for &(id, handle, in_body) in &ui.controls {
+                        if GetWindowLongW(handle as HWND, GWL_STYLE) as u32 & WS_VISIBLE == 0 {
+                            continue;
+                        }
+                        let mut r: RECT = zeroed();
+                        GetWindowRect(handle as HWND, &mut r);
+                        let mut origin = POINT {
+                            x: r.left,
+                            y: r.top,
+                        };
+                        ScreenToClient(hwnd, &mut origin);
+                        if in_body {
+                            assert!(
+                                origin.x >= ui.px(ui.shell().body.x),
+                                "Content must stay to the right of navigation"
+                            );
+                            assert!(origin.x + r.right - r.left <= ui.px(ui.width));
+                        }
+                        let child =
+                            Surface::new((r.right - r.left).max(1), (r.bottom - r.top).max(1));
+                        SendMessageW(handle as HWND, WM_ERASEBKGND, child.dc as usize, 0);
+                        SendMessageW(
+                            handle as HWND,
+                            WM_PRINTCLIENT,
+                            child.dc as usize,
+                            PRF_CLIENT as isize,
+                        );
+                        if id == 3003 {
+                            GdiFlush();
+                            let pixels = std::slice::from_raw_parts(
+                                child.pixels,
+                                (child.w * child.h) as usize,
+                            );
+                            assert!(
+                                pixels.iter().filter(|p| **p & 0xffffff == WHITE).count()
+                                    > pixels.len() / 2,
+                                "App profile selector must paint an opaque light field"
+                            );
+                        }
+                        let saved = SaveDC(surface.dc);
+                        if in_body {
+                            let b = ui.shell().body;
+                            IntersectClipRect(
+                                surface.dc,
+                                ui.px(b.x),
+                                ui.px(b.y),
+                                ui.px(b.x + b.w),
+                                ui.px(b.y + b.h),
+                            );
+                        }
+                        BitBlt(
+                            surface.dc, origin.x, origin.y, child.w, child.h, child.dc, 0, 0,
+                            SRCCOPY,
+                        );
+                        RestoreDC(surface.dc, saved);
+                    }
+                    surface.save(&std::env::current_dir().unwrap().join(format!(
+                        "target/headless-ui/{name}-{}-{width}.bmp",
+                        (scale * 100.) as i32
+                    )));
+                    if page == NAV_PROFILES {
+                        ui.scroll = 10000;
+                        ui.layout();
+                        let mut r: RECT = zeroed();
+                        GetWindowRect(ui.handle(3012) as HWND, &mut r);
+                        let mut bottom = POINT {
+                            x: r.right,
+                            y: r.bottom,
+                        };
+                        ScreenToClient(ui.body as HWND, &mut bottom);
+                        assert!(
+                            bottom.y <= ui.px(ui.shell().body.h),
+                            "Last profile help must be reachable"
+                        );
+                        ui.scroll = 0;
+                    }
+                }
+                assert_eq!(IsWindowVisible(hwnd), 0);
+                std::fs::remove_file(&ui.path).unwrap();
+                DestroyWindow(hwnd);
+                DeleteObject(ui.brush as HGDIOBJ);
+            }
+        }
+    }
+}
+
+#[test]
+fn hidden_native_app_profiles_save_without_committing_global_drafts() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let ui = hidden(1.);
+        assert_ne!(ui.handle(3002), 0, "The app profile editor must exist");
+        set(ui.inputs[0], "177");
+        set(ui.handle(3002), "Editor.exe");
+        set(ui.handle(3004), "72");
+        set(ui.handle(3005), "35");
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
+        let saved = settings::load(&ui.path).unwrap();
+        assert_eq!(saved.distance, 120.);
+        assert_eq!(saved.for_app("EDITOR.EXE").distance, 72.);
+        assert_eq!(
+            ui.shared
+                .settings
+                .read()
+                .unwrap()
+                .for_app("Editor.exe")
+                .omega,
+            35.
+        );
+        assert_eq!(text(ui.inputs[0]), "177");
+        SendMessageW(ui.handle(3003) as HWND, CB_SETCURSEL, 2, 0);
+        SendMessageW(
+            ui.hwnd as HWND,
+            WM_COMMAND,
+            3003 | ((CBN_SELCHANGE as usize) << 16),
+            0,
+        );
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
+        let saved = settings::load(&ui.path).unwrap();
+        assert_eq!(saved.for_app("Editor.exe").omega, 18.);
+        assert_eq!(IsWindowEnabled(ui.handle(3004) as HWND), 0);
+        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3007, 0);
+        assert!(settings::load(&ui.path).unwrap().profiles.is_empty());
+        std::fs::remove_file(&ui.path).unwrap();
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
+#[test]
+fn hidden_native_maximize_exposes_the_snap_hit_target() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let ui = hidden(1.);
+        let mut rect: RECT = zeroed();
+        GetWindowRect(ui.handle(WINDOW_MAXIMIZE) as HWND, &mut rect);
+        let x = (rect.left + rect.right) / 2;
+        let y = (rect.top + rect.bottom) / 2;
+        let point = ((x as u16 as u32) | ((y as u16 as u32) << 16)) as isize;
+        assert_eq!(
+            SendMessageW(ui.handle(WINDOW_MAXIMIZE) as HWND, WM_NCHITTEST, 0, point),
+            HTMAXBUTTON as isize
+        );
+        assert_eq!(
+            SendMessageW(ui.hwnd as HWND, WM_NCHITTEST, 0, point),
+            HTMAXBUTTON as isize
+        );
+        let mut bounds: MINMAXINFO = zeroed();
+        SendMessageW(
+            ui.hwnd as HWND,
+            WM_GETMINMAXINFO,
+            0,
+            (&mut bounds as *mut MINMAXINFO) as isize,
+        );
+        assert!(bounds.ptMinTrackSize.x <= 500);
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
+#[test]
+fn hidden_native_fixed_presets_apply_and_default_remembers_custom_tuning() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let mut ui = hidden(1.);
+        assert!(!text(ui.handle(1110)).contains("Custom"));
+        set(ui.inputs[0], "177");
+        assert!(text(ui.handle(1110)).contains("Custom"));
+        ui.apply();
+        assert!(text(ui.handle(1110)).contains("Custom"));
+        check(ui.reverse, true); // Unrelated option draft must not be auto-applied.
+        let combo = ui.handle(PRESET) as HWND;
+        SendMessageW(combo, CB_SETCURSEL, 2, 0);
+        ui.select_preset();
+        assert_eq!(
+            ui.shared.settings.read().unwrap().preset,
+            Preset::SuperSmooth
+        );
+        assert_eq!(settings::load(&ui.path).unwrap().omega, 18.);
+        assert!(ui.shared.settings.read().unwrap().wheel().free_spin);
+        assert!(text(ui.handle(1110)).contains("Flick to coast"));
+        assert!(!ui.shared.settings.read().unwrap().reverse);
+        assert_eq!(IsWindowEnabled(ui.inputs[0] as HWND), 0);
+        let before = text(ui.inputs[0]);
+        ui.step(400);
+        assert_eq!(text(ui.inputs[0]), before);
+        SendMessageW(combo, CB_SETCURSEL, 0, 0);
+        ui.select_preset();
+        assert_eq!(text(ui.inputs[0]), "177");
+        assert!(text(ui.handle(1110)).contains("Custom"));
+        assert_eq!(ui.shared.settings.read().unwrap().distance, 177.);
+        assert!(!ui.shared.settings.read().unwrap().wheel().free_spin);
+        assert_ne!(IsWindowEnabled(ui.inputs[0] as HWND), 0);
+        assert!(checked(ui.reverse));
+        std::fs::remove_file(&ui.path).unwrap();
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
+#[test]
+fn hidden_native_failed_preset_save_keeps_the_active_preset() {
+    unsafe {
+        let _graphics = GraphicsToken::start().unwrap();
+        let mut ui = hidden(1.);
+        ui.path = ui.path.join("missing/settings.json");
+        SendMessageW(ui.handle(PRESET) as HWND, CB_SETCURSEL, 1, 0);
+        ui.select_preset();
+        assert_eq!(ui.preset, Preset::Default);
+        assert_eq!(
+            SendMessageW(ui.handle(PRESET) as HWND, CB_GETCURSEL, 0, 0),
+            0
+        );
+        assert_eq!(ui.shared.settings.read().unwrap().preset, Preset::Default);
+        DestroyWindow(ui.hwnd as HWND);
+        DeleteObject(ui.brush as HGDIOBJ);
+    }
+}
+
 unsafe fn shared() -> Arc<Shared> {
     Arc::new(Shared {
         settings: RwLock::new(Settings::default()),
@@ -21,6 +343,7 @@ unsafe fn shared() -> Arc<Shared> {
         ticks: AtomicU64::new(0),
         hook_max_us: AtomicU64::new(0),
         fault: Mutex::new(String::new()),
+        diagnostics: scrollpilot::diagnostics::Diagnostics::default(),
     })
 }
 
@@ -679,7 +1002,7 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
             );
             assert_eq!(text(ui.inputs[1]), "18");
             assert_eq!(ui.preset, Preset::SuperSmooth);
-            assert_eq!(ui.shared.settings.read().unwrap().omega, 30.); // Apply is deliberate.
+            assert_eq!(ui.shared.settings.read().unwrap().omega, 18.); // Fixed presets auto-apply.
             ui.apply();
             let saved = settings::load(&ui.path).unwrap();
             assert_eq!(saved.preset, Preset::SuperSmooth);

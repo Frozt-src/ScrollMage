@@ -21,10 +21,12 @@ It lives in the tray, stays out of your way, and gives you a quick way to pause 
 ## Get it running
 
 1. Open **Scroll Mage** from the desktop shortcut or run `ScrollMage.exe`.
-2. Choose a preset in **Scroll settings**. Start with **Default** if you want a baseline, or **Super smooth** for a gentler response.
-3. Adjust the values and click **Apply settings** to activate your changes.
+2. Choose **Default** for editable tuning, **macOS style** for a softer accelerated response, or **Super smooth** for fast free-spin-style coasting. Selecting a preset saves and activates it immediately.
+3. Default allows numeric adjustments; click **Apply changes** to save those edits. Modified values show **Custom Default tuning**. The other two presets keep their fixed values locked. Switching back to Default restores its saved tuning.
 4. Try the result in **Scroll Test**, then in the apps you use.
 5. If an app feels better with its own scrolling, add it to **Excluded apps**.
+
+Use **App profiles** to give an EXE its own custom distance/response or fixed preset, or let it pass through. Save applies that app profile immediately; Remove returns it to global settings unless it is excluded. **Activity** explains input bypass reasons and shows accepted/output/bypass counts. A ready/enabled state alone does not mean input has been transformed.
 
 For exclusions, enter something like `game.exe` or paste the full EXE path, then click **Add** or press **Enter**. Adding or removing an exclusion saves it immediately. Other tuning changes and the sign-in option use **Apply settings**.
 
@@ -48,6 +50,8 @@ Run one scrolling utility at a time so they do not compete for the same input.
 
 The **macOS style** preset is inspired by that feel. It is Scroll Mage's own tuning, not Apple's scrolling engine.
 
+**Super smooth** emulates free-spin in software: a quick flick (rapid same-direction notches, or one packet containing several notches) starts a fast coast that gradually slows. Slow individual notches keep their normal distance. Reverse the wheel, click the left, middle, or right mouse button, pause, or change targets to stop the coast. Software cannot remove the physical detents of your wheel or detect your finger touching it. Its coast is independent of the test-friction control.
+
 **Test momentum friction** and **Test elastic response** affect dragging inside Scroll Test. They do not add momentum or elastic edges to every Windows app. Each app still controls how it displays incoming scrolling, so the result can vary.
 
 Browsers are excluded by default. Remove their entries if you want Scroll Mage to handle their wheel scrolling too.
@@ -56,7 +60,7 @@ Browsers are excluded by default. Remove their entries if you want Scroll Mage t
 
 Scroll Mage runs locally. Your settings stay in `settings.json` beside the executable. There is no account, activation system, or built-in updater.
 
-The app is built for 64-bit Windows. The current build is **0.6.7**.
+The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
 
 ## License
 
