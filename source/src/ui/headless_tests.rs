@@ -335,6 +335,7 @@ unsafe fn shared() -> Arc<Shared> {
         ui: AtomicUsize::new(0),
         pad: AtomicUsize::new(0),
         latch: AtomicUsize::new(0),
+        shift_latch: AtomicBool::new(false),
         wake: Handle(0),
         epoch: std::time::Instant::now(),
         hook_thread: AtomicU32::new(0),

@@ -94,6 +94,7 @@ pub struct Shared {
     pub ui: AtomicUsize,
     pub pad: AtomicUsize,
     pub latch: AtomicUsize,
+    pub shift_latch: AtomicBool,
     pub wake: Handle,
     pub epoch: Instant,
     pub hook_thread: AtomicU32,
@@ -316,6 +317,7 @@ unsafe fn emission_safe(s: &Shared, target: Target) -> bool {
     let mut p = zeroed();
     GetCursorPos(&mut p) != 0
         && s.enabled.load(Ordering::Acquire)
+        && s.hook_live.load(Ordering::Acquire)
         && target.eligible
         && wheel_routing() == target.routing
         && under_cursor(target, s.pad.load(Ordering::Acquire), p)
@@ -323,9 +325,15 @@ unsafe fn emission_safe(s: &Shared, target: Target) -> bool {
         && GetAsyncKeyState(VK_CONTROL as i32) >= 0
         && GetAsyncKeyState(VK_MENU as i32) >= 0
         && GetAsyncKeyState(VK_RBUTTON as i32) >= 0
+        && (GetAsyncKeyState(VK_SHIFT as i32) < 0) == s.shift_latch.load(Ordering::Acquire)
 }
 unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isize {
-    if code >= 0 && matches!(msg as u32, WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN) {
+    if code >= 0
+        && matches!(
+            msg as u32,
+            WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN
+        )
+    {
         if let Some(s) = SHARED.get() {
             if let Ok(mut e) = s.engine.try_lock() {
                 e.clear();
@@ -388,13 +396,16 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
                                 engine.clear();
                             }
                             let child = WindowFromPoint(m.pt) as usize;
-                            if s.latch.load(Ordering::Acquire) != child {
+                            if s.latch.load(Ordering::Acquire) != child
+                                || s.shift_latch.load(Ordering::Acquire) != shift
+                            {
                                 engine.clear();
                             }
                             accepted =
                                 engine.push_tuned(s.now(), amount, horizontal, t.hwnd, t.tuning);
                             if accepted {
                                 s.latch.store(child, Ordering::Release);
+                                s.shift_latch.store(shift, Ordering::Release);
                                 reason = InputReason::Accepted;
                             }
                         }
@@ -552,6 +563,7 @@ impl Runtime {
                 ui: AtomicUsize::new(0),
                 pad: AtomicUsize::new(0),
                 latch: AtomicUsize::new(0),
+                shift_latch: AtomicBool::new(false),
                 wake: Handle(event as usize),
                 epoch: Instant::now(),
                 hook_thread: AtomicU32::new(0),
@@ -590,6 +602,9 @@ impl Runtime {
                     UnhookWindowsHookEx(h);
                 }
                 hs.hook_live.store(false, Ordering::Release);
+                if !h.is_null() && !hs.quitting.load(Ordering::Acquire) {
+                    hs.fail("Mouse hook thread stopped. Smoothing paused; restart Scroll Mage to retry.");
+                }
             });
             if !rx.recv().unwrap_or(false) {
                 s.quitting.store(true, Ordering::Release);
@@ -775,6 +790,11 @@ mod tests {
             s.pad.store(window as usize, Ordering::Release);
             s.refresh_target();
             assert!(s.target.read().unwrap().eligible);
+            let physical_shift = GetAsyncKeyState(VK_SHIFT as i32) < 0;
+            s.shift_latch.store(!physical_shift, Ordering::Release);
+            s.latch.store(window as usize, Ordering::Release);
+            assert!(!emission_safe(s, *s.target.read().unwrap()), "A changed Shift state must cancel an old tail before it becomes a different app command");
+            s.shift_latch.store(physical_shift, Ordering::Release);
             let m = MSLLHOOKSTRUCT {
                 pt: point,
                 mouseData: 120u32 << 16,
@@ -868,6 +888,15 @@ mod tests {
             assert_eq!(s.sent.load(Ordering::Relaxed), paused_sent);
             assert!(!s.enabled.load(Ordering::Acquire));
             assert!(!s.engine.lock().unwrap().active());
+            // A hook thread that exits unexpectedly must disable the engine too.
+            s.enabled.store(true, Ordering::Release);
+            PostThreadMessageW(s.hook_thread.load(Ordering::Acquire), WM_QUIT, 0, 0);
+            pump(Duration::from_millis(100));
+            assert!(!s.hook_live.load(Ordering::Acquire));
+            assert!(
+                !s.enabled.load(Ordering::Acquire),
+                "Lost hook thread must pause output"
+            );
             let result = serde_json::json!({"test":"owned Windows input receiver","vertical_smoothed_total":120,"horizontal_smoothed_total":120,"output_events":emitted,"received_events":EVENTS.load(Ordering::Relaxed),"hook_max_microseconds":s.hook_max_us.load(Ordering::Relaxed),"idle_frame_ticks_added":0,"hardware_input":"NOT RUN - hook entry used constructed events; output used actual Windows SendInput and a live hook","injection_loop_prevention":"passed", "free_spin_early_units":coast_early,"free_spin_later_units":coast_late,"free_spin_click_brake":"passed","free_spin_pause_brake":"passed"});
             std::fs::write(
                 "target/native-verification.json",

@@ -62,6 +62,8 @@ Scroll Mage runs locally. Your settings stay in `settings.json` beside the execu
 
 The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
 
+The local **0.6.10 candidate** contains production-audit fixes and repeatable validation/packaging tools. It is not published or a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md).
+
 ## License
 
 Scroll Mage is proprietary and closed source. All rights reserved.

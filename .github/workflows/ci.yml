@@ -1,0 +1,57 @@
+name: Windows quality
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Validate logic and hidden native UI
+        run: ./tools/Validate.ps1
+      - name: Check dependency advisories
+        run: python ./tools/audit_dependencies.py
+      - name: Build and verify portable candidate
+        run: ./tools/Package.ps1
+      - name: Check isolated paused packaged application
+        run: |
+          $exe = Get-ChildItem -LiteralPath dist -Filter ScrollMage.exe -File -Recurse
+          if (@($exe).Count -ne 1) { throw 'Expected exactly one candidate executable.' }
+          ./tools/Test-Candidate.ps1 -Executable $exe.FullName
+      - name: Verify package rejection paths
+        run: |
+          $package = Get-ChildItem -LiteralPath dist -Filter '*candidate*.zip' -File
+          if (@($package).Count -ne 1) { throw 'Expected exactly one candidate ZIP.' }
+          ./tools/Test-PackageVerifier.ps1 -Path $package.FullName
+      - name: Retain candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-candidate-${{ github.sha }}
+          path: |
+            dist/*candidate*.zip
+            dist/*candidate*.zip.sha256
+            source/target/dependency-audit.json
+            source/target/candidate-smoke.json
+          if-no-files-found: warn
+          retention-days: 14

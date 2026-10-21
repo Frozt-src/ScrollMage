@@ -7,6 +7,127 @@ fn path(name: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&p).unwrap();
     p.join(format!("{}-{name}.json", std::process::id()))
 }
+
+#[test]
+fn concurrent_saves_leave_one_complete_reloadable_file() {
+    let p = path("concurrent");
+    let writers: Vec<_> = (0..16)
+        .map(|index| {
+            let p = p.clone();
+            std::thread::spawn(move || {
+                let result = save(
+                    &p,
+                    &Settings {
+                        distance: 100. + index as f64,
+                        exclusions: vec![format!("writer{index}.exe")],
+                        ..Settings::default()
+                    },
+                );
+                (index, result.is_ok())
+            })
+        })
+        .collect();
+    // Windows may reject a simultaneous replacement with access denied. Such
+    // failures must be reported; they must not damage a successful writer's file.
+    let successful: Vec<_> = writers
+        .into_iter()
+        .map(|writer| writer.join().unwrap())
+        .filter_map(|(index, ok)| ok.then_some(index))
+        .collect();
+    assert!(!successful.is_empty());
+    let saved = load(&p).unwrap();
+    let index = (saved.distance - 100.) as usize;
+    assert!(successful.contains(&index));
+    assert_eq!(saved.exclusions, vec![format!("writer{index}.exe")]);
+    std::fs::remove_file(p).unwrap();
+}
+
+#[test]
+#[cfg(windows)]
+fn locked_destination_preserves_settings_and_recovers_after_release() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let p = path("locked");
+    save(&p, &Settings::default()).unwrap();
+    let original = std::fs::read(&p).unwrap();
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&p)
+        .unwrap();
+    let updated = Settings {
+        distance: 240.,
+        ..Settings::default()
+    };
+    assert!(save(&p, &updated).is_err());
+    drop(lock);
+    assert_eq!(std::fs::read(&p).unwrap(), original);
+    save(&p, &updated).unwrap();
+    assert_eq!(load(&p).unwrap().distance, 240.);
+    std::fs::remove_file(p).unwrap();
+}
+
+#[test]
+fn oversized_save_preserves_reloadable_settings() {
+    let p = path("oversized-save");
+    save(&p, &Settings::default()).unwrap();
+    let original = std::fs::read(&p).unwrap();
+    let names: Vec<_> = (0..128)
+        .map(|i| format!("{i:03}{}.exe", "x".repeat(240)))
+        .collect();
+    let s = Settings {
+        exclusions: names.clone(),
+        incompatible_processes: names.clone(),
+        profiles: names
+            .into_iter()
+            .map(|executable| Profile {
+                executable,
+                preset: None,
+                distance: 120.,
+                omega: 30.,
+                bypass: false,
+            })
+            .collect(),
+        ..Settings::default()
+    };
+    s.validate().unwrap();
+    assert!(serde_json::to_vec_pretty(&s).unwrap().len() > 65536);
+    assert!(
+        save(&p, &s).is_err(),
+        "Save must not write a file the loader will refuse"
+    );
+    assert_eq!(std::fs::read(&p).unwrap(), original);
+    assert!(load(&p).is_ok());
+    std::fs::remove_file(p).unwrap();
+}
+
+#[test]
+fn failed_save_removes_its_temporary_file() {
+    let p = path("blocked-replace");
+    std::fs::create_dir_all(&p).unwrap();
+    let stem = p.file_stem().unwrap().to_string_lossy().into_owned();
+    let temps = || {
+        std::fs::read_dir(p.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                name.starts_with(&stem) && name.ends_with(".tmp")
+            })
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>()
+    };
+    let before = temps();
+    assert!(save(&p, &Settings::default()).is_err());
+    let after = temps();
+    std::fs::remove_dir(&p).unwrap();
+    for temp in after.iter().filter(|temp| !before.contains(temp)) {
+        std::fs::remove_file(temp).unwrap();
+    }
+    assert_eq!(
+        after, before,
+        "A failed save must clean up only its own temporary file"
+    );
+}
 #[test]
 fn roundtrip_preserves_user_tuning_and_exclusions() {
     let p = path("roundtrip");
