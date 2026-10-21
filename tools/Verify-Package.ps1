@@ -14,14 +14,14 @@ try {
         }
         if (-not $entry.Name) { continue }
         $relative = $name.Substring(11)
-        $allowed = $relative -in @('ScrollMage.exe','ScrollMage.ico','README.md','CHANGELOG.md','START HERE.txt','Start Paused.cmd','LICENSE','THIRD_PARTY_NOTICES.md','DEPENDENCIES.json','SHA256SUMS.txt','assets/scroll-mage-banner.png') -or $relative -match '^vendor-licenses/[A-Za-z0-9_.-]+/(license|copying|copyright|notice)[A-Za-z0-9_.-]*$'
+        $allowed = $relative -in @('ScrollMage.exe','ScrollMage.ico','README.md','CHANGELOG.md','MOUSE ACCEPTANCE.md','START HERE.txt','Start Paused.cmd','LICENSE','THIRD_PARTY_NOTICES.md','DEPENDENCIES.json','SHA256SUMS.txt','assets/scroll-mage-banner.png') -or $relative -match '^vendor-licenses/[A-Za-z0-9_.-]+/(license|copying|copyright|notice)[A-Za-z0-9_.-]*$'
         if ($relative -match '\.(pem|pfx|key|rs|pdb)$') { $allowed = $false }
         if (-not $allowed -or $files.ContainsKey($relative)) { throw "Unexpected or duplicate package member: $relative" }
         $bytes += $entry.Length
         if ($entry.Length -gt 32MB -or $bytes -gt 64MB -or $files.Count -ge 256) { throw 'Package size/count budget exceeded.' }
         $files.Add($relative, $entry)
     }
-    foreach ($required in @('ScrollMage.exe','ScrollMage.ico','README.md','CHANGELOG.md','START HERE.txt','Start Paused.cmd','LICENSE','THIRD_PARTY_NOTICES.md','DEPENDENCIES.json','SHA256SUMS.txt','assets/scroll-mage-banner.png')) {
+    foreach ($required in @('ScrollMage.exe','ScrollMage.ico','README.md','CHANGELOG.md','MOUSE ACCEPTANCE.md','START HERE.txt','Start Paused.cmd','LICENSE','THIRD_PARTY_NOTICES.md','DEPENDENCIES.json','SHA256SUMS.txt','assets/scroll-mage-banner.png')) {
         if (-not $files.ContainsKey($required)) { throw "Missing required package member: $required" }
     }
     if ($files['SHA256SUMS.txt'].Length -gt 65536) { throw 'Checksum list is too large.' }

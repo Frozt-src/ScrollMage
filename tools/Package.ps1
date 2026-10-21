@@ -37,6 +37,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $package 'assets') -Force | Out-Null
     Copy-Item -LiteralPath 'source/target/x86_64-pc-windows-msvc/release/scrollpilot.exe' -Destination (Join-Path $package 'ScrollMage.exe')
     foreach ($file in @('ScrollMage.ico','LICENSE','THIRD_PARTY_NOTICES.md','CHANGELOG.md')) { Copy-Item -LiteralPath $file -Destination $package }
+    Copy-Item -LiteralPath 'source/docs/MOUSE-ACCEPTANCE-0.6.10.md' -Destination (Join-Path $package 'MOUSE ACCEPTANCE.md')
     Copy-Item -LiteralPath 'assets/scroll-mage-banner.png' -Destination (Join-Path $package 'assets')
     if (@(Get-ChildItem -LiteralPath 'source/vendor-licenses' -Recurse -Force | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'License tree contains an unexpected link.' }
     Copy-Item -LiteralPath 'source/vendor-licenses' -Destination (Join-Path $package 'vendor-licenses') -Recurse
@@ -55,7 +56,8 @@ Browsers are excluded by default; remove your browser from Excluded apps to try 
 
 No personal settings are bundled. This candidate is unsigned and is not a claim
 of completed physical-mouse, app-compatibility, accessibility or Snap acceptance.
-Keep the included license notices with redistributed copies. See README.md.
+Keep the included license notices with redistributed copies. See README.md and
+MOUSE ACCEPTANCE.md for the remaining hands-on checks and rollback instructions.
 "@
     [IO.File]::WriteAllText((Join-Path $package 'START HERE.txt'),$instructions+"`n",$utf8)
     $inventory = [ordered]@{version=$version;target='x86_64-pc-windows-msvc';lock_sha256=(Get-FileHash -LiteralPath 'source/Cargo.lock').Hash.ToLowerInvariant();dependencies=$dependencies}

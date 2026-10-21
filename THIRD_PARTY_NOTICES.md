@@ -2,8 +2,8 @@
 
 Scroll Mage's original code, documentation, and original visual assets are proprietary and closed source under LICENSE. This does not change the licenses or copyright notices of third-party components.
 
-Pinned dependencies are listed in source/Cargo.lock. Unmodified copies of upstream license and copyright files are included under source/vendor-licenses/ by exact package version. These include the dependencies' MIT, Apache, Unicode, Boost, and other applicable license and copyright files. They apply to the corresponding third-party components, not to Scroll Mage's original code.
+Pinned dependencies are listed in source/Cargo.lock; candidate ZIPs include DEPENDENCIES.json with their versions. Unmodified copies of upstream license and copyright files are included under source/vendor-licenses/ in the repository and vendor-licenses/ beside the packaged executable, by exact package version. These include the dependencies' MIT, Apache, Unicode, Boost, and other applicable license and copyright files. They apply to the corresponding third-party components, not to Scroll Mage's original code.
 
-Rust standard-library and toolchain copyright notices are included under source/vendor-licenses/rust-toolchain/. Preserve the applicable third-party license and copyright files with redistributed copies of this package.
+Rust standard-library and toolchain copyright notices are included in the rust-toolchain/ subfolder of that license directory. Preserve the applicable third-party license and copyright files with redistributed copies of this package.
 
-The native executable also relies on Windows system libraries and the Microsoft C runtime installed on the host. Those components are not copied into this package. Source rebuild requires a compatible Rust MSVC toolchain and Windows linker.
+The release build links the Microsoft C runtime statically and relies on host Windows system libraries. Windows system DLLs are not copied into this package. Source rebuild requires a compatible Rust MSVC toolchain, Microsoft C++ build tools and Windows SDK. Applicable compiler/runtime redistribution terms still apply.

@@ -72,17 +72,17 @@ Build tooling follows [Cargo's test selection/filtering contracts](https://doc.r
 
 | Check | Result |
 | --- | --- |
-| Logic suites | PASS: 63 tests, including two new settings regressions |
+| Logic suites | PASS: 65 tests, including settings size, cleanup, locked-destination recovery and concurrent-replacement integrity |
 | Hidden native UI/command suite | PASS: 12 tests, including startup-command validation |
-| Controlled Windows receiver | PASS: 1 fixture, including actual SendInput, self-tag handling, idle sleep, free-spin, click/pause braking, Shift mismatch rejection and unexpected hook-thread exit |
-| Total Rust tests | **76 passed** |
+| Controlled Windows receiver | Earlier audit PASS: 1 fixture, including actual SendInput, self-tag handling, idle sleep, free-spin, click/pause braking, Shift mismatch rejection and unexpected hook-thread exit. Not rerun during the follow-up because the user's existing app was running. |
+| Current follow-up Rust tests | **77 passed** (65 logic + 12 hidden native); the earlier desktop receiver result is separate |
 | Formatting / all-target Clippy with lint warnings denied | PASS; Cargo reported a cache hard-link fallback and copied cache files |
 | Static-CRT AMD64 candidate build | PASS with installed Rust 1.98.1 (48a229cea) |
 | Dependency advisories | PASS: OSV query completed for all 13 Cargo.lock registry packages, zero listed advisories; not a source-security audit or a guarantee of no vulnerabilities |
-| ZIP integrity and allowlist | PASS: 39 member hashes, no personal settings/source/PDBs |
+| ZIP integrity and allowlist | PASS: 40 member hashes, including the new mouse acceptance checklist; no personal settings/source/PDBs |
 | Adversarial package checks | PASS: changed README, injected settings.json and traversal entry rejected |
 | Workflow static check | PASS: YAML parses, action references use full commit SHAs, contents permission is read-only |
-| Hosted Windows CI / branch-protection enforcement | NOT RUN / NOT CONFIGURED by this local task; new workflow is local, unpushed |
+| Hosted Windows CI / branch-protection enforcement | First hosted run fully PASS; Node 20 action deprecation warning found and pinned Node 24 replacements prepared for a final rerun. Main is confirmed unprotected (GitHub API); no policy change made. |
 | PE manifest/resources | PASS: complete REA static inventory; AMD64 candidate identity 0.6.10.0, resources present; shell loading is a separate observation |
 
 The pinned `rust-toolchain.toml` requests 1.98.1. This machine has the compiler under the installed `stable` alias, not a separately installed `1.98.1` alias. Local runs used process-scoped `RUSTUP_TOOLCHAIN=stable` after verifying the exact compiler version. No additional toolchain was installed. The fresh hosted-run toolchain download remains unverified until CI runs.
@@ -91,7 +91,7 @@ The OSV checker sends only public crate names/versions to the [documented queryb
 
 ## Release gates, in order
 
-1. **Run and enforce CI on GitHub.** Push a reviewed branch, obtain a green hosted run and configure required checks on main. Prove a clean checkout builds without ignored local configuration; retain artifact and dependency reports. No auto-release workflow is added here.
+1. **Run and enforce CI on GitHub.** Obtain a fully green hosted run and configure required checks on main before release integration. The audit branch is pushed, and a local Git archive checkout in a path containing spaces passed validation and candidate packaging without ignored local configuration. Hosted execution is recorded below. No auto-release workflow is added here.
 2. **Physical mouse/app matrix.** Test the owner's mouse on Windows 11 and representative mouse wheels for any broader device claims. Cover browsers with exclusions removed, an editor, File Explorer, a hosted Store app, horizontal/Shift behavior, elevated targets, target changes, sleep/resume and a long idle/scroll soak. Verify global smoothing, Super smooth flick/coast/braking, and that an excluded app receives normal input without a remaining smoothed tail. Record visible behavior, event totals, CPU, memory/handle trend and hook latency distribution. Test the actual packaged executable, not only the constructed fixture. Trackpad smoothing is outside the approved target; retain the existing fine-resolution/injected-input pass-through policy.
 3. **Accessibility and native shell acceptance.** Keyboard-only navigation, Narrator/UI Automation names and state, focus visibility, high contrast, text scaling and mixed-DPI monitors; visible Snap flyout, maximize/restore, tray recovery after Explorer restart, and sign-in after moving the portable folder. [Microsoft accessibility expectations](https://learn.microsoft.com/en-us/windows/apps/design/accessibility/accessibility-overview) require evidence beyond painted screenshots and standard HWND classes.
 4. **Publisher trust.** The existing 0.6.9 executable is verified unsigned. Provision an owner-controlled signing identity, sign/timestamp the release and verify the signature using the [documented signing tools](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool). Certificates, trust services and secrets were not created or inspected here. Signing does not by itself guarantee SmartScreen reputation or compatibility.
@@ -104,14 +104,19 @@ October 21 follow-up: formatting, Clippy, dependency advisories, package integri
 
 `tools/Test-Candidate.ps1` adds a paused packaged-binary probe from a separate Unicode folder with spaces. It checks executable-relative save location, corrupt-file preservation and explicit recovery, failed preset-save rollback, a short idle resource sample and clean Quit. Its local run stopped before launching a copy because the user's root `ScrollMage.exe` was already running (PID 79824 at the check). That instance, its settings and sign-in registration were left untouched. The probe is included in hosted CI; its execution result must be recorded before claiming packaged runtime acceptance. The short idle sample is not a long-running resource soak.
 
-GitHub Actions is enabled. The official Rust distribution endpoint returned HTTP 200 for the pinned 1.98.1 manifest checksum. A clean hosted run is being attempted on the audit branch; no main merge or release publication is part of this check. Branch protection is a separate repository policy decision.
+GitHub Actions is enabled. The official Rust distribution endpoint returned HTTP 200 for the pinned 1.98.1 manifest checksum. [The first clean hosted run](https://github.com/Frozt-src/ScrollMage/actions/runs/39676821292) passed all steps at commit `fdb3766dc73dd125815029d019ddf46cc40b5420`: 77 Rust tests, advisory check, candidate build/verification, three packaged runtime scenarios and three adversarial package checks. Downloaded evidence is under ignored `source/target/hosted-readiness-first`.
+
+The hosted packaged probe passed fresh startup/save in a Unicode path with spaces, preservation of corrupt bytes until an explicit recovery edit, blocked-save rollback and clean Quit. Its three-second paused idle sample recorded 0 ms added CPU and zero handle/GDI/USER deltas; this is a short sample, not a long-session performance claim. The local packaged executable has not been launched because the user's existing app is active; hosted results apply to the hosted-built executable, whose hash is recorded in its report.
+
+The first hosted run exposed Node 20 deprecation warnings for the old pinned actions. Official releases and action metadata were inspected; checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 and support the existing inputs. They remain pinned to full verified commit SHAs with read-only repository permission and disabled checkout credential persistence. A final run will validate these updates and the packaged acceptance document. No main merge or release publication is part of this check. Branch protection is a separate repository policy decision.
 
 ## Candidate and publication status
 
 Candidate ZIP: `dist/ScrollMage-0.6.10-candidate-windows-x64.zip`.
 
-- ZIP SHA-256: `8d765533415b9565061804b7670825e506337ae812444e0c81afb459cce17cef`.
-- EXE SHA-256: `35c8aeeb64022b2110d7f75067525d41509f6a3e90f75b23e97958b7a1bcbc0b`.
+- ZIP SHA-256: `090659bb5f83d8815c735a80f3c049952d8accb91555433c2eafe551ed661f70`.
+- EXE SHA-256: `4542064744a0f631d464b8528072b1704e6216dcdad2f6508ee794770a06805a`.
 - No personal settings are bundled. The candidate starts with normal defaults, including browser exclusions.
 - Old 0.6.9 share ZIP SHA-256 remains `ca2adde128f90615e8ae86bdede62a617baa8dbeac0858413e15b9383fb488bf`.
-- Changes are local and uncommitted on the audit branch; the published 0.6.9 release is unchanged. Do not label this candidate production-ready based solely on automated checks.
+- Audit changes and follow-up documentation/packaging are kept on the audit branch. Main and the published 0.6.9 release are unchanged. Do not label this candidate production-ready based solely on automated checks.
+- [Mouse acceptance and rollback checklist](MOUSE-ACCEPTANCE-0.6.10.md) is also included in the ZIP as `MOUSE ACCEPTANCE.md`.
