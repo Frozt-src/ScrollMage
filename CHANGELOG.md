@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.10 candidate - Unreleased
+## 0.6.10 candidate - 2026-10-21 (prerelease)
 
 - Fix settings saves that exceeded the loader's 64 KiB limit; oversized saves now preserve the last valid file. Reads are bounded before parsing.
 - Use exclusively created temporary settings files and remove them on failure.
@@ -10,7 +10,7 @@
 - Add pinned Rust tooling, a Windows CI workflow, repeatable validation, dependency-advisory checks, candidate packaging and adversarial package verification.
 - Add locked-destination recovery and concurrent-save integrity checks, plus an isolated packaged-app probe for Unicode portable paths, corrupt settings, failed saves and clean shutdown. Package rejection checks now require a valid baseline first.
 - Include mouse acceptance and rollback instructions in the candidate ZIP; correct stale build versions, packaged license paths and the static-runtime description.
-- Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. The published 0.6.9 release remains unchanged.
+- Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
 
 ## 0.6.9 - 2026-10-18
 

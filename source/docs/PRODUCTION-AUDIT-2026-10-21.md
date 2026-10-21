@@ -82,10 +82,10 @@ Build tooling follows [Cargo's test selection/filtering contracts](https://doc.r
 | ZIP integrity and allowlist | PASS: 40 member hashes, including the new mouse acceptance checklist; no personal settings/source/PDBs |
 | Adversarial package checks | PASS: changed README, injected settings.json and traversal entry rejected |
 | Workflow static check | PASS: YAML parses, action references use full commit SHAs, contents permission is read-only |
-| Hosted Windows CI / branch-protection enforcement | First hosted run fully PASS; Node 20 action deprecation warning found and pinned Node 24 replacements prepared for a final rerun. Main is confirmed unprotected (GitHub API); no policy change made. |
+| Hosted Windows CI / branch-protection enforcement | Final hosted run fully PASS at `bda7d8cb193e01eb5cc6e8aaac2b694d201369b8`, including pinned Node 24 actions, 77 tests, packaged runtime and artifact retention. Main is confirmed unprotected (GitHub API); no policy change made. |
 | PE manifest/resources | PASS: complete REA static inventory; AMD64 candidate identity 0.6.10.0, resources present; shell loading is a separate observation |
 
-The pinned `rust-toolchain.toml` requests 1.98.1. This machine has the compiler under the installed `stable` alias, not a separately installed `1.98.1` alias. Local runs used process-scoped `RUSTUP_TOOLCHAIN=stable` after verifying the exact compiler version. No additional toolchain was installed. The fresh hosted-run toolchain download remains unverified until CI runs.
+The pinned `rust-toolchain.toml` requests 1.98.1. This machine has the compiler under the installed `stable` alias, not a separately installed `1.98.1` alias. Local runs used process-scoped `RUSTUP_TOOLCHAIN=stable` after verifying the exact compiler version. No additional local toolchain was installed. The fresh hosted-run toolchain installation passed in the linked CI runs.
 
 The OSV checker sends only public crate names/versions to the [documented querybatch API](https://google.github.io/osv.dev/post-v1-querybatch/), handles pagination, and fails on network/errors/incomplete results. Detailed evidence is in ignored local `source/target/dependency-audit.json` and `source/evidence/production-audit-*` files. A clean advisory result cannot establish runtime correctness.
 
@@ -108,15 +108,20 @@ GitHub Actions is enabled. The official Rust distribution endpoint returned HTTP
 
 The hosted packaged probe passed fresh startup/save in a Unicode path with spaces, preservation of corrupt bytes until an explicit recovery edit, blocked-save rollback and clean Quit. Its three-second paused idle sample recorded 0 ms added CPU and zero handle/GDI/USER deltas; this is a short sample, not a long-session performance claim. The local packaged executable has not been launched because the user's existing app is active; hosted results apply to the hosted-built executable, whose hash is recorded in its report.
 
-The first hosted run exposed Node 20 deprecation warnings for the old pinned actions. Official releases and action metadata were inspected; checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 and support the existing inputs. They remain pinned to full verified commit SHAs with read-only repository permission and disabled checkout credential persistence. A final run will validate these updates and the packaged acceptance document. No main merge or release publication is part of this check. Branch protection is a separate repository policy decision.
+The first hosted run exposed Node 20 deprecation warnings for the old pinned actions. Official releases and action metadata were inspected; checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 and support the existing inputs. They remain pinned to full verified commit SHAs with read-only repository permission and disabled checkout credential persistence. [The final hosted run](https://github.com/Frozt-src/ScrollMage/actions/runs/39677503336) passed every step in 4m29s at `bda7d8cb193e01eb5cc6e8aaac2b694d201369b8`, including the updated actions and packaged acceptance document. Its three packaged scenarios passed; the short paused sample again recorded zero added CPU/handle/GDI/USER values. Downloaded final evidence is under ignored `source/target/hosted-readiness-final`. No main merge or release publication was performed; remote main remains `13700e7e24f62ca5de75582819ddd508c35eb4fc`. Branch protection is a separate repository policy decision.
 
 ## Candidate and publication status
 
 Candidate ZIP: `dist/ScrollMage-0.6.10-candidate-windows-x64.zip`.
 
-- ZIP SHA-256: `090659bb5f83d8815c735a80f3c049952d8accb91555433c2eafe551ed661f70`.
-- EXE SHA-256: `4542064744a0f631d464b8528072b1704e6216dcdad2f6508ee794770a06805a`.
+- ZIP SHA-256: `2c08fc10470603f063edbe84f12277d92a049dda1c41cff0a0fc1353ec3964e9`.
+- EXE SHA-256: `a24503a8b71aa1fff4a9fbdbb34d05233f6bb42691285efe4c8c53a6248564a5`.
 - No personal settings are bundled. The candidate starts with normal defaults, including browser exclusions.
 - Old 0.6.9 share ZIP SHA-256 remains `ca2adde128f90615e8ae86bdede62a617baa8dbeac0858413e15b9383fb488bf`.
 - Audit changes and follow-up documentation/packaging are kept on the audit branch. Main and the published 0.6.9 release are unchanged. Do not label this candidate production-ready based solely on automated checks.
+- The final CI outcome is recorded after the checked commit; the later release-preparation changes affect documentation and packaged release notes only.
 - [Mouse acceptance and rollback checklist](MOUSE-ACCEPTANCE-0.6.10.md) is also included in the ZIP as `MOUSE ACCEPTANCE.md`.
+
+## Authorized candidate publication
+
+After the audit, the owner authorized merging the audit branch into main and publishing the updated candidate ZIP with its changelog. Release preparation uses tag `v0.6.10-candidate.1` and keeps the GitHub release marked prerelease. The dated candidate changelog is included in the refreshed ZIP. Historical statements above about unchanged main/publication describe the audit checkpoint, before this authorized integration. Physical acceptance, signing and required-check protection remain open; this publication is for testing.
