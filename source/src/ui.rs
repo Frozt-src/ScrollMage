@@ -427,7 +427,7 @@ impl Ui {
         self.shared.pad.store(self.pad, Ordering::Release);
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
-        self.static_text("Version 0.6.9\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
+        self.static_text("Version 0.6.10 candidate\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
         self.build_profiles();
         self.static_text("Scrolling activity", 3110, true, self.fonts.section);
         self.static_text("", 3111, true, self.fonts.body);
@@ -742,7 +742,7 @@ impl Ui {
             self.scale,
             self.fonts.small,
             MUTED,
-            "Version 0.6.9",
+            "Version 0.6.10 candidate",
             DT_SINGLELINE,
         );
     }
@@ -1969,11 +1969,21 @@ pub fn run(runtime: &Runtime, path: PathBuf, note: String, tray: bool) -> Result
                 .fail("App monitoring timer failed. Restart to retry.");
         }
         let mut msg = zeroed();
-        while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
+        let message_result = loop {
+            let result = GetMessageW(&mut msg, null_mut(), 0, 0);
+            if result <= 0 {
+                break result;
+            }
             if IsDialogMessageW(h, &msg) == 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+        };
+        let message_error = (message_result < 0).then(std::io::Error::last_os_error);
+        // A message-queue error is not a successful shutdown. Destroy owned UI
+        // before its boxed state drops, even when GetMessage did not return WM_QUIT.
+        if IsWindow(h) != 0 {
+            DestroyWindow(h);
         }
         if !event.is_null() {
             UnhookWinEvent(event);
@@ -1983,7 +1993,10 @@ pub fn run(runtime: &Runtime, path: PathBuf, note: String, tray: bool) -> Result
             app.store(0, Ordering::Release);
         }
         DeleteObject(brush);
-        Ok(())
+        match message_error {
+            Some(error) => Err(format!("Windows interface message loop failed: {error}")),
+            None => Ok(()),
+        }
     }
 }
 pub fn single_instance() -> Result<Handle, String> {

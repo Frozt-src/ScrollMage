@@ -339,9 +339,14 @@ pub fn format_profiles(profiles: &[Profile]) -> String {
         .join("\r\n")
 }
 pub fn load(path: &std::path::Path) -> Result<Settings, String> {
-    match std::fs::read(path) {
-        Ok(bytes) => {
-            if bytes.len() > 65536 {
+    use std::io::Read;
+    match std::fs::File::open(path) {
+        Ok(file) => {
+            let mut bytes = Vec::new();
+            file.take(MAX_SETTINGS_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|e| format!("Cannot read settings: {e}"))?;
+            if bytes.len() > MAX_SETTINGS_BYTES {
                 return Err("Settings file is too large; original file preserved.".into());
             }
             let mut s: Settings = serde_json::from_slice(&bytes).map_err(|_| {
@@ -357,19 +362,46 @@ pub fn load(path: &std::path::Path) -> Result<Settings, String> {
         Err(e) => Err(format!("Cannot read settings: {e}")),
     }
 }
+const MAX_SETTINGS_BYTES: usize = 65536;
+static SAVE_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+struct PendingSettings {
+    path: std::path::PathBuf,
+    file: Option<std::fs::File>,
+}
+impl Drop for PendingSettings {
+    fn drop(&mut self) {
+        // Close first: Windows does not permit removal of an open temporary file.
+        self.file.take();
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
 pub fn save(path: &std::path::Path, settings: &Settings) -> Result<(), String> {
     use std::io::Write;
     settings.validate()?;
     let mut normalized = settings.clone();
     normalized.migrate_profiles();
     normalized.validate()?;
-    let temp = path.with_extension(format!("{}.tmp", std::process::id()));
-    let mut f = std::fs::File::create(&temp).map_err(|e| e.to_string())?;
     let bytes = serde_json::to_vec_pretty(&normalized).map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_SETTINGS_BYTES {
+        return Err("Settings exceed the 64 KiB limit; existing file preserved.".into());
+    }
+    let sequence = SAVE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let temp = path.with_extension(format!("{}.{}.tmp", std::process::id(), sequence));
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(|e| e.to_string())?;
+    let mut pending = PendingSettings {
+        path: temp.clone(),
+        file: Some(file),
+    };
+    let f = pending.file.as_mut().unwrap();
     f.write_all(&bytes)
         .and_then(|_| f.sync_all())
         .map_err(|e| e.to_string())?;
-    drop(f);
+    pending.file.take();
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
