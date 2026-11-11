@@ -58,14 +58,40 @@ Browsers are excluded by default. Remove their entries if you want Scroll Mage t
 
 ## Local and straightforward
 
-Scroll Mage runs locally. Your settings stay in `settings.json` beside the executable. There is no account, activation system, or built-in updater.
+Scroll Mage runs locally. Your settings stay in `settings.json` beside the executable, so keep the app in a folder you can write to. There is no account, activation system, telemetry, or built-in updater, and the app contains no networking code.
 
-The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
+To smooth scrolling, Scroll Mage reads mouse wheel events through a Windows low-level mouse hook and sends smoothed wheel events in their place. It runs without administrator rights and leaves apps that run as administrator alone. [SECURITY.md](../SECURITY.md) describes exactly what it touches.
 
-The local **0.6.10 candidate** contains production-audit fixes and repeatable validation/packaging tools. It is not published or a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md).
+The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). Builds are not code-signed yet, so Windows SmartScreen may warn on first run; check your download against the SHA-256 checksum published with the release. See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
+
+The **0.6.10 candidate** is available as a [prerelease](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.10-candidate.1) for acceptance testing. It contains production-audit fixes and repeatable validation/packaging tools, and is not a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md).
+
+## Known limitations
+
+- Trackpads and precision (sub-notch) wheel input pass through unsmoothed.
+- The interface uses a fixed light theme and does not yet follow Windows High Contrast.
+- Each app decides how it draws incoming scrolling, so results vary between apps.
+
+## Build from source
+
+You need 64-bit Windows, Rust (the version is pinned in `rust-toolchain.toml`), the Microsoft C++ build tools and a Windows SDK.
+
+```powershell
+./tools/Validate.ps1
+```
+
+```powershell
+./tools/Package.ps1
+```
+
+The first command checks formatting, lints and runs the tests. The second builds a portable ZIP under `dist/`. [BUILD.md](../BUILD.md) covers manual builds and release checks.
+
+## Contributing
+
+Bug reports and pull requests are welcome. Start with [CONTRIBUTING.md](../CONTRIBUTING.md), and report security problems privately as described in [SECURITY.md](../SECURITY.md).
 
 ## License
 
-Scroll Mage is proprietary and closed source. All rights reserved.
+Scroll Mage's code is open source under the [MIT License](LICENSE). Its artwork is licensed under [CC BY 4.0](../LICENSE-ARTWORK.md).
 
-See [LICENSE](LICENSE) for the project terms and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the licenses and notices that apply to bundled third-party components.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists the licenses and notices that apply to bundled third-party components.

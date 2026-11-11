@@ -2,7 +2,10 @@
 name = "scrollpilot"
 version = "0.6.10"
 edition = "2021"
-license-file = "LICENSE"
+description = "Smooth, tunable mouse wheel scrolling for Windows."
+license = "MIT"
+repository = "https://github.com/Frozt-src/ScrollMage"
+readme = "README.md"
 publish = false
 
 [dependencies]

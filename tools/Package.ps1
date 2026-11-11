@@ -36,14 +36,14 @@ try {
     $package = Join-Path $staging 'ScrollMage'
     New-Item -ItemType Directory -Path (Join-Path $package 'assets') -Force | Out-Null
     Copy-Item -LiteralPath 'source/target/x86_64-pc-windows-msvc/release/scrollpilot.exe' -Destination (Join-Path $package 'ScrollMage.exe')
-    foreach ($file in @('ScrollMage.ico','LICENSE','THIRD_PARTY_NOTICES.md','CHANGELOG.md')) { Copy-Item -LiteralPath $file -Destination $package }
+    foreach ($file in @('ScrollMage.ico','LICENSE','LICENSE-ARTWORK.md','THIRD_PARTY_NOTICES.md','CHANGELOG.md')) { Copy-Item -LiteralPath $file -Destination $package }
     Copy-Item -LiteralPath 'source/docs/MOUSE-ACCEPTANCE-0.6.10.md' -Destination (Join-Path $package 'MOUSE ACCEPTANCE.md')
     Copy-Item -LiteralPath 'assets/scroll-mage-banner.png' -Destination (Join-Path $package 'assets')
     if (@(Get-ChildItem -LiteralPath 'source/vendor-licenses' -Recurse -Force | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'License tree contains an unexpected link.' }
     Copy-Item -LiteralPath 'source/vendor-licenses' -Destination (Join-Path $package 'vendor-licenses') -Recurse
     $utf8 = [Text.UTF8Encoding]::new($false)
     $readme = [IO.File]::ReadAllText((Join-Path $repo 'README.md')).Replace('Start Paused.lnk','Start Paused.cmd')
-    $readme = $readme -replace '(?m)^The local \*\*0\.6\.10 candidate\*\*.*$', 'This is an unsigned 0.6.10 candidate. Physical-device, accessibility and visible shell acceptance remain incomplete.'
+    $readme = $readme -replace '(?m)^The \*\*0\.6\.10 candidate\*\*.*$', 'This is an unsigned 0.6.10 candidate. Physical-device, accessibility and visible shell acceptance remain incomplete.'
     [IO.File]::WriteAllText((Join-Path $package 'README.md'),$readme,$utf8)
     [IO.File]::WriteAllText((Join-Path $package 'Start Paused.cmd'),"@echo off`r`nstart `"`" /D `"%~dp0`" `"%~dp0ScrollMage.exe`" --paused`r`n",$utf8)
     $instructions = @"

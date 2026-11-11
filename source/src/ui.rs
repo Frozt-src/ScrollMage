@@ -427,7 +427,7 @@ impl Ui {
         self.shared.pad.store(self.pad, Ordering::Release);
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
-        self.static_text("Version 0.6.10 candidate\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
+        self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
         self.build_profiles();
         self.static_text("Scrolling activity", 3110, true, self.fonts.section);
         self.static_text("", 3111, true, self.fonts.body);
@@ -742,7 +742,7 @@ impl Ui {
             self.scale,
             self.fonts.small,
             MUTED,
-            "Version 0.6.10 candidate",
+            concat!("Version ", env!("CARGO_PKG_VERSION")),
             DT_SINGLELINE,
         );
     }
@@ -1479,7 +1479,8 @@ unsafe extern "system" fn body(h: HWND, msg: u32, w: usize, l: isize) -> isize {
         }
         WM_MOUSEWHEEL => {
             let delta = ((w >> 16) as u16 as i16) as i32;
-            ui.scroll -= delta / 120 * 72;
+            // Multiply first: high-resolution wheels send deltas below one notch.
+            ui.scroll -= delta * 72 / 120;
             ui.layout();
             0
         }
@@ -1608,20 +1609,22 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             ui.refresh_icons();
             presets::style_popup(ui.handle(PRESET) as HWND, ui.scale);
             let old_fonts = std::mem::replace(&mut ui.fonts, Fonts::new(ui.scale));
-            for &(id, control, _) in &ui.controls {
-                let font = if id == 900 {
-                    ui.fonts.display
-                } else if id == 1120 {
-                    ui.fonts.brand
-                } else if id == 902 || (1100..1105).contains(&id) {
-                    ui.fonts.section
-                } else if (201..207).contains(&id) {
-                    ui.fonts.number
-                } else if id == 904 || (1010..1016).contains(&id) || (1110..1116).contains(&id) {
-                    ui.fonts.small
-                } else {
-                    ui.fonts.body
-                };
+            // Map each control's current font to its rescaled equivalent, so the
+            // role chosen at creation survives every DPI change.
+            let roles = [
+                (old_fonts.body, ui.fonts.body),
+                (old_fonts.small, ui.fonts.small),
+                (old_fonts.section, ui.fonts.section),
+                (old_fonts.display, ui.fonts.display),
+                (old_fonts.brand, ui.fonts.brand),
+                (old_fonts.number, ui.fonts.number),
+            ];
+            for &(_, control, _) in &ui.controls {
+                let current = SendMessageW(control as HWND, WM_GETFONT, 0, 0) as usize;
+                let font = roles
+                    .iter()
+                    .find(|(old, _)| *old == current)
+                    .map_or(ui.fonts.body, |(_, new)| *new);
                 SendMessageW(control as HWND, WM_SETFONT, font, 1);
             }
             for (id, row_height) in [(PRESET, 32), (3003, 28)] {
@@ -2009,6 +2012,10 @@ pub fn single_instance() -> Result<Handle, String> {
         if GetLastError() == ERROR_ALREADY_EXISTS {
             let window = FindWindowW(wide("ScrollPilot.Main").as_ptr(), null());
             if !window.is_null() {
+                // Let the running instance take the foreground when it restores.
+                let mut pid = 0;
+                GetWindowThreadProcessId(window, &mut pid);
+                AllowSetForegroundWindow(pid);
                 PostMessageW(window, RESTORE, 0, 0);
             }
             return Err("Scroll Mage is already running.".into());

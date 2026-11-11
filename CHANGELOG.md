@@ -10,6 +10,12 @@
 - Add pinned Rust tooling, a Windows CI workflow, repeatable validation, dependency-advisory checks, candidate packaging and adversarial package verification.
 - Add locked-destination recovery and concurrent-save integrity checks, plus an isolated packaged-app probe for Unicode portable paths, corrupt settings, failed saves and clean shutdown. Package rejection checks now require a valid baseline first.
 - Include mouse acceptance and rollback instructions in the candidate ZIP; correct stale build versions, packaged license paths and the static-runtime description.
+- Release the code under the MIT License and the artwork under CC BY 4.0; add contributing, security and conduct guides plus issue and pull-request templates.
+- Keep heading and small-label fonts correct after the window moves to a display with different scaling.
+- Scroll the app's own pages and the exclusion list with high-resolution wheels that send less than one notch at a time.
+- Fix removal of exclusion rows so that it no longer changes the control list while Windows is still reading it.
+- Ask Windows to let the running instance come to the front when the app is opened a second time.
+- Show the package version in the app and in the executable's file properties (product name, version and copyright).
 - Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
 
 ## 0.6.9 - 2026-10-18
