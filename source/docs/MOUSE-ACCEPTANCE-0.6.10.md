@@ -6,7 +6,7 @@ Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scr
 
 1. Quit the existing app using **Quit Scroll Mage** in its tray menu. Closing the window only hides it. Do not run two copies together.
 2. Extract the complete candidate ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.6.10**.
-3. Open Activity and verify smoothing is enabled. Fresh candidate defaults exclude browsers: remove the browser EXE from Excluded apps before the browser tests. Existing user settings are not bundled.
+3. Open Activity and verify smoothing is enabled. Fresh candidate defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
 
 ## Record these results
 

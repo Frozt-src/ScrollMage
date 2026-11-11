@@ -7,7 +7,7 @@ use std::{
     mem::{size_of, zeroed},
     ptr::null,
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex, OnceLock, RwLock,
     },
     thread::{self, JoinHandle},
@@ -95,6 +95,10 @@ pub struct Shared {
     pub pad: AtomicUsize,
     pub latch: AtomicUsize,
     pub shift_latch: AtomicBool,
+    /// Notches accepted while the worker held the engine (vertical, horizontal).
+    /// The hook must never wait, so it hands them over here instead of letting
+    /// them through raw and cancelling the scroll already in motion.
+    pub queued: [AtomicI32; 2],
     pub wake: Handle,
     pub epoch: Instant,
     pub hook_thread: AtomicU32,
@@ -242,6 +246,9 @@ impl Shared {
                 if let Ok(mut target) = self.target.write() {
                     if *target != next {
                         e.clear();
+                        for q in &self.queued {
+                            q.store(0, Ordering::Release);
+                        }
                         self.latch.store(0, Ordering::Release);
                         self.diagnostics.invalidate();
                         *target = next;
@@ -391,11 +398,22 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
                         if opts.reverse {
                             amount = -amount;
                         }
-                        if let Ok(mut engine) = s.engine.try_lock() {
+                        let child = WindowFromPoint(m.pt) as usize;
+                        let engine = s.engine.try_lock();
+                        if engine.is_err()
+                            && s.latch.load(Ordering::Acquire) == child
+                            && s.shift_latch.load(Ordering::Acquire) == shift
+                        {
+                            // The worker is mid-frame on this same scroll: queue
+                            // the notch for its next frame rather than block.
+                            s.queued[usize::from(horizontal)].fetch_add(amount, Ordering::AcqRel);
+                            accepted = true;
+                            reason = InputReason::Accepted;
+                        }
+                        if let Ok(mut engine) = engine {
                             if s.interrupted.swap(false, Ordering::AcqRel) {
                                 engine.clear();
                             }
-                            let child = WindowFromPoint(m.pt) as usize;
                             if s.latch.load(Ordering::Acquire) != child
                                 || s.shift_latch.load(Ordering::Acquire) != shift
                             {
@@ -496,10 +514,20 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
                 // Read the latch only after input acceptance is serialized with this frame.
                 let target = s.target.read().map(|x| *x).unwrap_or_default();
                 let safe = emission_safe(&s, target);
-                if !safe || s.interrupted.swap(false, Ordering::AcqRel) {
+                let interrupted = s.interrupted.swap(false, Ordering::AcqRel);
+                let queued = s.queued.each_ref().map(|q| q.swap(0, Ordering::AcqRel));
+                if !safe {
                     e.clear();
                     active = false;
                 } else {
+                    if interrupted {
+                        e.clear();
+                    }
+                    for (axis, amount) in queued.into_iter().enumerate() {
+                        if amount != 0 {
+                            e.push_tuned(s.now(), amount, axis == 1, target.hwnd, target.tuning);
+                        }
+                    }
                     let values = e.tick(s.now(), target.hwnd);
                     active = e.active();
                     for (axis, delta) in values.into_iter().enumerate() {
@@ -564,6 +592,7 @@ impl Runtime {
                 pad: AtomicUsize::new(0),
                 latch: AtomicUsize::new(0),
                 shift_latch: AtomicBool::new(false),
+                queued: Default::default(),
                 wake: Handle(event as usize),
                 epoch: Instant::now(),
                 hook_thread: AtomicU32::new(0),

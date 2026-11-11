@@ -761,6 +761,7 @@ impl Ui {
                 round(dc, c, 4, self.scale, WHITE, Some(BORDER));
             }
             let c = cards[0];
+            let locked = self.preset.fixed();
             for i in 0..6 {
                 let y = c.y + FORM_ROW_START + i * FORM_ROW_GAP + if i >= 4 { 8 } else { 0 }
                     - self.scroll;
@@ -769,7 +770,7 @@ impl Ui {
                     Rect::new(c.x + c.w - 124, y, 104, 36),
                     4,
                     self.scale,
-                    WHITE,
+                    if locked { LOCKED_FIELD } else { WHITE },
                     Some(if GetFocus() == self.inputs[i as usize] as HWND {
                         ACCENT
                     } else {
@@ -1082,13 +1083,19 @@ impl Ui {
                 );
             }
             let tint = if selected { ACCENT_TEXT } else { MUTED };
-            let glyph = if id == NAV_SETTINGS { "⚙" } else { "☷" };
+            // Segoe MDL2 Assets: Setting, AllApps, Diagnostic, Info.
+            let glyph = match id {
+                NAV_SETTINGS => "\u{E713}",
+                NAV_PROFILES => "\u{E71D}",
+                NAV_ACTIVITY => "\u{E9D9}",
+                _ => "\u{E946}",
+            };
             if w >= 140 {
                 label(
                     dc,
                     Rect::new(16, 0, 28, height),
                     self.scale,
-                    self.fonts.section,
+                    self.fonts.icon,
                     tint,
                     glyph,
                     DT_SINGLELINE | DT_VCENTER | DT_CENTER,
@@ -1109,22 +1116,27 @@ impl Ui {
                 DT_SINGLELINE | DT_VCENTER,
             );
         } else if (400..412).contains(&id) {
-            round(
-                dc,
-                Rect::new(0, 2, w, height - 2),
-                4,
-                self.scale,
-                0xd8dbe5,
-                None,
-            );
-            round(
-                dc,
-                Rect::new(0, if pressed { 2 } else { 0 }, w, height - 2),
-                4,
-                self.scale,
-                if pressed { SELECTED } else { 0xf3f4f8 },
-                if focused { Some(ACCENT) } else { None },
-            );
+            let enabled = IsWindowEnabled(h) != 0;
+            let pressed = pressed && enabled;
+            if enabled {
+                round(
+                    dc,
+                    Rect::new(0, 2, w, height - 2),
+                    4,
+                    self.scale,
+                    0xd8dbe5,
+                    None,
+                );
+                round(
+                    dc,
+                    Rect::new(0, if pressed { 2 } else { 0 }, w, height - 2),
+                    4,
+                    self.scale,
+                    if pressed { SELECTED } else { 0xf3f4f8 },
+                    if focused { Some(ACCENT) } else { None },
+                );
+            }
+            let glyph = if enabled { MUTED } else { DISABLED };
             let up = (id - 400).is_multiple_of(2);
             let center = w / 2;
             let top = height / 2 + if pressed { 2 } else { 0 };
@@ -1135,7 +1147,7 @@ impl Ui {
                 center,
                 if up { top - 1 } else { top + 1 },
                 self.scale,
-                MUTED,
+                glyph,
                 1,
             );
             line(
@@ -1145,11 +1157,22 @@ impl Ui {
                 center + 3,
                 if up { top + 2 } else { top - 2 },
                 self.scale,
-                MUTED,
+                glyph,
                 1,
             );
+        } else if id == APPLY && IsWindowEnabled(h) == 0 {
+            // Nothing to apply: show a quiet confirmation, not a dead button.
+            label(
+                dc,
+                Rect::new(8, 0, w - 16, height),
+                self.scale,
+                self.fonts.body,
+                MUTED,
+                &format!("\u{2713}  {caption}"),
+                DT_SINGLELINE | DT_VCENTER | DT_CENTER,
+            );
         } else {
-            let primary = id == TOGGLE;
+            let primary = id == TOGGLE || id == APPLY;
             round(
                 dc,
                 Rect::new(0, 0, w, height),
@@ -1417,6 +1440,17 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
     }
     if msg == WM_CTLCOLORSTATIC {
         let id = GetDlgCtrlID(l as HWND) as u16;
+        if (201..207).contains(&id) || id == 215 {
+            // Disabled and read-only edits ask for static colours. They must
+            // paint an opaque background, or each new value is drawn over the
+            // old one.
+            static LOCKED: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+            let brush = *LOCKED.get_or_init(|| CreateSolidBrush(color(LOCKED_FIELD)) as usize);
+            SetTextColor(w as HDC, color(MUTED));
+            SetBkMode(w as HDC, OPAQUE as i32);
+            SetBkColor(w as HDC, color(LOCKED_FIELD));
+            return Some(brush as isize);
+        }
         SetTextColor(
             w as HDC,
             color(

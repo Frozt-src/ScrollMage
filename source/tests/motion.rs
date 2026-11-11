@@ -119,10 +119,16 @@ fn fixed_profiles_roundtrip_with_preset_identity() {
     assert_eq!(reparsed[1].preset, Some(Preset::SuperSmooth));
     let s = Settings {
         acceleration_ms: 300.,
-        acceleration_max: 4.,
+        acceleration_max: 7.,
         profiles,
         ..Settings::default()
     };
-    assert_eq!(s.for_app("editor.exe").acceleration_max, 1.5);
-    assert_eq!(s.for_app("browser.exe").acceleration_max, 1.);
+    assert_eq!(
+        s.for_app("editor.exe").acceleration_max,
+        Preset::MacosStyle.tuning().acceleration_max
+    );
+    assert_eq!(
+        s.for_app("browser.exe").acceleration_max,
+        Preset::SuperSmooth.tuning().acceleration_max
+    );
 }

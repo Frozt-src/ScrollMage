@@ -18,6 +18,10 @@
 - Ask Windows to let the running instance come to the front when the app is opened a second time.
 - Show the package version in the app and in the executable's file properties (product name, version and copyright).
 - Replace the spring-and-coast scrolling engine with one momentum model: each notch starts at full speed and eases out exponentially, and Super smooth's free-spin is the same model with lower friction while a flick glides. Scroll distances stay exact at any frame rate. "Spring response" is now called **Response** and keeps its saved values.
+- Make the presets feel distinct. **macOS style** eases out about twice as long as Default and a fast spin travels about 2.5 times as far; **Super smooth** has the softest ease-out as well as free-spin glide.
+- Smooth browsers by default. Fresh settings no longer exclude Firefox, Chrome and Edge; existing exclusion lists are kept.
+- Keep a scroll in motion when a wheel notch arrives while a frame is being sent. Previously that notch passed through unsmoothed and cancelled the current motion, most often during fast spins.
+- Fix locked tuning fields drawing each new value over the old one. Fixed presets now show their values on a read-only background with inactive steppers, the sidebar uses Windows icons, the save button turns into a quiet "Settings saved" note when there is nothing to apply, and each preset describes how it feels.
 - Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
 
 ## 0.6.9 - 2026-10-18

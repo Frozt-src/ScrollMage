@@ -50,13 +50,13 @@ Run one scrolling utility at a time so they do not compete for the same input.
 
 **Distance** controls the scroll amount per wheel notch. **Response** controls how quickly each scroll eases to a stop: every notch starts at full speed and slows smoothly, and a higher response finishes sooner. **Acceleration window** and **Maximum acceleration** control how repeated wheel input builds speed. A maximum acceleration of **1** turns acceleration off.
 
-The **macOS style** preset is inspired by that feel. It is Scroll Mage's own tuning, not Apple's scrolling engine.
+The **macOS style** preset is inspired by that feel: a soft, longer ease-out, with strong acceleration so slow notches stay precise while a fast spin travels several times further. It is Scroll Mage's own tuning, not Apple's scrolling engine.
 
 **Super smooth** emulates free-spin in software: a quick flick (rapid same-direction notches, or one packet containing several notches) starts a fast coast that gradually slows. Slow individual notches keep their normal distance. Reverse the wheel, click the left, middle, or right mouse button, pause, or change targets to stop the coast. Software cannot remove the physical detents of your wheel or detect your finger touching it. Its coast is independent of the test-friction control.
 
 **Test momentum friction** and **Test elastic response** affect dragging inside Scroll Test. They do not add momentum or elastic edges to every Windows app. Each app still controls how it displays incoming scrolling, so the result can vary.
 
-Browsers are excluded by default. Remove their entries if you want Scroll Mage to handle their wheel scrolling too.
+Browsers are smoothed like any other app. Apps that scroll in whole lines, such as File Explorer and many older Windows programs, collect small wheel movements into line-sized steps, so they look less smooth than browsers, Office or code editors.
 
 ## Local and straightforward
 
