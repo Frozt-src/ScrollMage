@@ -2,6 +2,8 @@
 
 Thanks for helping. Bug reports, compatibility notes and pull requests are all welcome.
 
+Scroll Mage is a scrolling extension for desktop mice. Touchpad support is out of scope, so please don't send changes that intercept or reshape touchpad scrolling.
+
 ## Reporting a problem
 
 Open an issue and include:

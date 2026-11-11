@@ -2,11 +2,13 @@
 
 ![Scroll Mage: smooth scrolling for Windows](assets/scroll-mage-banner.png)
 
-**Make your mouse wheel feel right.**
+**A scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable.**
 
 I built Scroll Mage because I wanted smoother scrolling on Windows with settings I could actually dial in. Pick a preset, adjust the feel, and leave specific apps alone when their scrolling already works for you.
 
 It lives in the tray, stays out of your way, and gives you a quick way to pause whenever you need it.
+
+Scroll Mage is for desktop mice and does not support touchpads. Precision touchpads send fine-grained scrolling, which Scroll Mage leaves to Windows. Some older touchpad drivers imitate a notched mouse wheel instead; Windows does not tell Scroll Mage which device sent those events, so they may be smoothed like a mouse. Press **Alt + P** to pause if that happens.
 
 ## What it does
 
@@ -68,7 +70,7 @@ The **0.6.10 candidate** is available as a [prerelease](https://github.com/Frozt
 
 ## Known limitations
 
-- Trackpads and precision (sub-notch) wheel input pass through unsmoothed.
+- Touchpads are not supported, by design. Mouse wheels in a high-resolution mode that sends less than one notch at a time pass through unsmoothed.
 - The interface uses a fixed light theme and does not yet follow Windows High Contrast.
 - Each app decides how it draws incoming scrolling, so results vary between apps.
 

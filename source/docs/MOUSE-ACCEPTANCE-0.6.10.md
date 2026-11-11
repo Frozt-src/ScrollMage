@@ -1,6 +1,6 @@
 # Mouse acceptance for the 0.6.10 candidate
 
-Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Trackpad smoothing is outside this release target. Automated tests do not establish physical feel or visible compatibility.
+Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scroll Mage supports desktop mice only; it does not smooth precision-touchpad scrolling. Automated tests do not establish physical feel or visible compatibility.
 
 ## Prepare
 
@@ -19,6 +19,7 @@ Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Tra
 | Move the pointer to another app or another scroll pane during a coast | Old momentum does not scroll the new target. | |
 | Add an app to Excluded apps and restart Scroll Mage | That app passes through normally; the exclusion survives restart and no old coast continues into it. Remove it and confirm smoothing resumes where supported. | |
 | Shift + wheel / native sideways wheel if present | Horizontal scrolling follows the selected option; changing Shift during a coast does not turn an old tail into a new app command. | |
+| Touchpad, if this PC has one | Two-finger scrolling looks and feels the same with Scroll Mage running as with it quit. If it differs, record the touchpad and driver: a driver that imitates a notched wheel cannot be told apart from a mouse. | |
 | Ctrl/Alt + wheel and elevated apps | Modifier gestures remain native. An elevated target may be bypassed with an explanation rather than silently claiming delivery. | |
 | Sleep/resume and an extended normal session | No stuck coast, lost input, persistent high CPU or growing memory/handle trend. Report the time and Activity text if input stops being accepted. | |
 | Maximize hover, resize, mixed DPI and text scaling | Snap flyout appears; text and controls remain visible and reachable. | |

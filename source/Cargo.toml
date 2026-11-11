@@ -2,7 +2,7 @@
 name = "scrollpilot"
 version = "0.6.10"
 edition = "2021"
-description = "Smooth, tunable mouse wheel scrolling for Windows."
+description = "A scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable."
 license = "MIT"
 repository = "https://github.com/Frozt-src/ScrollMage"
 readme = "README.md"

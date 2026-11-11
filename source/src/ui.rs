@@ -427,7 +427,7 @@ impl Ui {
         self.shared.pad.store(self.pad, Ordering::Release);
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
-        self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
+        self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage is a scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable. It is built for desktop mice; touchpad scrolling is left to Windows. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
         self.build_profiles();
         self.static_text("Scrolling activity", 3110, true, self.fonts.section);
         self.static_text("", 3111, true, self.fonts.body);

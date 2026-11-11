@@ -108,7 +108,7 @@ impl InputReason {
             Self::None | Self::Tagged => "No wheel input observed",
             Self::Accepted => "Wheel notch accepted; output pending",
             Self::Emitted => "Wheel output sent to Windows",
-            Self::Precision => "Precision wheel delta passes through unchanged",
+            Self::Precision => "Touchpad or fine wheel input passes through to Windows",
             Self::Modifiers => "Modifier/button held; ordinary wheel input passes through",
             Self::ExternalInjected => "Externally injected input passes through unchanged",
             Self::Disabled => "Smoothing paused; ordinary wheel input passes through",
