@@ -324,7 +324,7 @@ impl Ui {
         );
         let labels = [
             "Distance",
-            "Spring response",
+            "Response",
             "Acceleration window",
             "Maximum acceleration",
             "Test momentum friction",

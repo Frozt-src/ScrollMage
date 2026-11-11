@@ -75,7 +75,7 @@ impl Tuning {
     fn validate(self) -> Result<(), String> {
         for (label, value, min, max) in [
             ("Distance", self.distance, 1., 960.),
-            ("Spring response", self.omega, 10., 80.),
+            ("Response", self.omega, 10., 80.),
             ("Acceleration window", self.acceleration_ms, 10., 500.),
             ("Maximum acceleration", self.acceleration_max, 1., 10.),
             ("Preview friction", self.friction, 1., 12.),

@@ -13,7 +13,7 @@ Scroll Mage is for desktop mice and does not support touchpads. Precision touchp
 ## What it does
 
 - Smooths regular mouse wheel input in supported Windows apps.
-- Lets you adjust scroll distance, spring response, and acceleration.
+- Lets you adjust scroll distance, response, and acceleration.
 - Includes **Default**, **macOS style**, and **Super smooth** presets.
 - Supports horizontal scrolling with **Shift + mouse wheel** and an optional reverse direction.
 - Lets you exclude individual apps by their EXE name or full path.
@@ -48,7 +48,7 @@ Run one scrolling utility at a time so they do not compete for the same input.
 
 ## Dial in the feel
 
-**Distance** controls the scroll amount per wheel notch. **Spring response** controls how quickly the motion catches up. **Acceleration window** and **Maximum acceleration** control how repeated wheel input builds speed. A maximum acceleration of **1** turns acceleration off.
+**Distance** controls the scroll amount per wheel notch. **Response** controls how quickly each scroll eases to a stop: every notch starts at full speed and slows smoothly, and a higher response finishes sooner. **Acceleration window** and **Maximum acceleration** control how repeated wheel input builds speed. A maximum acceleration of **1** turns acceleration off.
 
 The **macOS style** preset is inspired by that feel. It is Scroll Mage's own tuning, not Apple's scrolling engine.
 

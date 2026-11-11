@@ -17,6 +17,7 @@
 - Fix removal of exclusion rows so that it no longer changes the control list while Windows is still reading it.
 - Ask Windows to let the running instance come to the front when the app is opened a second time.
 - Show the package version in the app and in the executable's file properties (product name, version and copyright).
+- Replace the spring-and-coast scrolling engine with one momentum model: each notch starts at full speed and eases out exponentially, and Super smooth's free-spin is the same model with lower friction while a flick glides. Scroll distances stay exact at any frame rate. "Spring response" is now called **Response** and keeps its saved values.
 - Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
 
 ## 0.6.9 - 2026-10-18

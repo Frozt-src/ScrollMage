@@ -31,14 +31,14 @@ impl Ui {
             ("EXE name or full path", 3020),
             ("Scrolling profile", 3021),
             ("Distance", 3022),
-            ("Spring response", 3023),
+            ("Response", 3023),
         ] {
             self.static_text(title, id, true, self.fonts.small);
         }
         for (id, name) in [
             (EXE, "Application executable"),
             (DISTANCE, "App scroll distance"),
-            (RESPONSE, "App spring response"),
+            (RESPONSE, "App response"),
         ] {
             self.create(
                 "EDIT",
