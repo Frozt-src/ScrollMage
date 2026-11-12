@@ -1,4 +1,5 @@
 mod actions;
+mod activity;
 mod app_icons;
 mod backdrop;
 mod control_motion;
@@ -429,8 +430,7 @@ impl Ui {
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
         self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage is a scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable. It is built for desktop mice; touchpad scrolling is left to Windows. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
         self.build_profiles();
-        self.static_text("Scrolling activity", 3110, true, self.fonts.section);
-        self.static_text("", 3111, true, self.fonts.body);
+        self.build_activity();
         self.ready = true;
         self.loading_controls = false;
         self.sync_preset_controls();
@@ -514,7 +514,7 @@ impl Ui {
         } else if self.view == NAV_PROFILES {
             720
         } else if self.view == NAV_ACTIVITY {
-            520
+            self.activity_layout().height
         } else {
             shell.body.h
         };
@@ -602,8 +602,7 @@ impl Ui {
         } else if self.view == NAV_PROFILES {
             self.layout_profiles();
         } else if self.view == NAV_ACTIVITY {
-            self.at(3110, Rect::new(20, 20 - self.scroll, w - 40, 32));
-            self.at(3111, Rect::new(20, 70 - self.scroll, w - 40, 430));
+            self.layout_activity(&self.activity_layout());
         } else {
             self.at(1120, Rect::new(32, 30, w - 80, 46));
             self.at(
@@ -622,7 +621,7 @@ impl Ui {
         let (title, copy) = self.shared.status_text();
         set(self.status_title, &title);
         set(self.status, copy.lines().next().unwrap_or(""));
-        set(self.handle(3111), &format!("{title}\r\n\r\n{copy}\r\n\r\nPoint at an app and scroll to see whether its input is accepted or passed through. Counters show this session's activity, not visible frame rate.\r\n\r\nFine-resolution and external injected input pass through. Other apps decide whether small wheel events produce pixel movement or line steps.\r\n\r\nSuper smooth adds a fast coast after a quick wheel flick. Reverse, click or pause to stop it. Momentum friction and elastic response belong to dragging in Scroll Test. Ordinary wheel output cannot read another app's content bounds or add elastic edges."));
+        self.update_activity(&title, &copy);
         set(
             self.toggle,
             if enabled {
@@ -816,6 +815,8 @@ impl Ui {
                     BORDER
                 }),
             );
+        } else if self.view == NAV_ACTIVITY {
+            self.paint_activity(dc);
         } else {
             round(
                 dc,
@@ -1270,7 +1271,8 @@ unsafe extern "system" fn static_label(
             || id == 903
             || id == 904
             || (1010..1016).contains(&id)
-            || (1110..1116).contains(&id);
+            || (1110..1116).contains(&id)
+            || activity::muted(id);
         let rect = Rect::new(
             0,
             0,
@@ -1459,6 +1461,7 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
                     || id == 904
                     || (1010..1016).contains(&id)
                     || (1110..1116).contains(&id)
+                    || activity::muted(id)
                 {
                     MUTED
                 } else {
