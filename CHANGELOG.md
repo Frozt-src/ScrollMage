@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.6.10 candidate - 2026-10-21 (prerelease)
+## 0.7.0 candidate - 2026-11-13 (prerelease)
+
+Includes everything from the 0.6.10 candidate of 2026-10-21, which was published as a prerelease only.
+
 
 - Fix settings saves that exceeded the loader's 64 KiB limit; oversized saves now preserve the last valid file. Reads are bounded before parsing.
 - Use exclusively created temporary settings files and remove them on failure.
