@@ -347,6 +347,9 @@ unsafe fn shared() -> Arc<Shared> {
         sent: AtomicU64::new(0),
         ticks: AtomicU64::new(0),
         hook_max_us: AtomicU64::new(0),
+        hook_seen: AtomicU64::new(0),
+        watch_cursor: AtomicU64::new(0),
+        watch_seen: AtomicU64::new(0),
         fault: Mutex::new(String::new()),
         diagnostics: scrollpilot::diagnostics::Diagnostics::default(),
     })

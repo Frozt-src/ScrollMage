@@ -23,6 +23,9 @@
 - Keep a scroll in motion when a wheel notch arrives while a frame is being sent. Previously that notch passed through unsmoothed and cancelled the current motion, most often during fast spins.
 - Fix locked tuning fields drawing each new value over the old one. Fixed presets now show their values on a read-only background with inactive steppers, the sidebar uses Windows icons, the save button turns into a quiet "Settings saved" note when there is nothing to apply, and each preset describes how it feels.
 - Redesign the Activity page: a status card with a coloured dot and the current app, live tiles for Accepted, Output and Bypassed counts that stack on narrow windows, and a shorter "How it works" card. Screen readers still read the status and every count.
+- Smooth sooner after the pointer moves to another window. The first wheel notch there still passes through, but it now triggers an immediate look-up of the new app instead of waiting up to a quarter of a second.
+- Re-install the mouse hook when the pointer moves but the hook has seen no mouse input, which is how a hook that Windows removed silently shows itself.
+- Deliver a wheel notch that was queued during a busy frame even when the engine cannot take it.
 - Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
 
 ## 0.6.9 - 2026-10-18

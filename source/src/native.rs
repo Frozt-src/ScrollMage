@@ -22,6 +22,8 @@ use windows_sys::Win32::{
 
 pub const UPDATE: u32 = WM_APP + 1;
 pub const REFRESH: u32 = WM_APP + 2;
+/// Hook-thread message: remove the mouse hook and install it again.
+const REHOOK: u32 = WM_APP + 3;
 pub const TAG: usize = 0x5343504c;
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
@@ -103,6 +105,11 @@ pub struct Shared {
     pub epoch: Instant,
     pub hook_thread: AtomicU32,
     pub hook_live: AtomicBool,
+    /// Mouse events the hook has been called for, including pointer moves.
+    pub hook_seen: AtomicU64,
+    /// Pointer position and `hook_seen` at the last `watch_hook` call.
+    pub watch_cursor: AtomicU64,
+    pub watch_seen: AtomicU64,
     pub sent: AtomicU64,
     pub ticks: AtomicU64,
     pub hook_max_us: AtomicU64,
@@ -153,6 +160,26 @@ impl Shared {
             &fault,
             self.now() as u64,
         )
+    }
+    /// Windows can drop a low-level hook without telling its owner. If the
+    /// pointer moved since the last call but the hook saw no mouse event, ask
+    /// the hook thread to install the hook again. A needless re-install (the
+    /// pointer was moved by a program) is harmless.
+    pub fn watch_hook(&self) {
+        unsafe {
+            let mut p: POINT = zeroed();
+            if GetCursorPos(&mut p) == 0 {
+                return;
+            }
+            // The top bit keeps a real position distinct from the initial zero.
+            let cursor = 1 << 63 | u64::from(p.x as u32) << 31 | u64::from(p.y as u32 >> 1);
+            let seen = self.hook_seen.load(Ordering::Relaxed);
+            let before = self.watch_cursor.swap(cursor, Ordering::Relaxed);
+            let silent = self.watch_seen.swap(seen, Ordering::Relaxed) == seen;
+            if before != 0 && before != cursor && silent && self.hook_live.load(Ordering::Acquire) {
+                PostThreadMessageW(self.hook_thread.load(Ordering::Acquire), REHOOK, 0, 0);
+            }
+        }
     }
     pub fn fail(&self, reason: &str) {
         if let Ok(mut f) = self.fault.lock() {
@@ -335,6 +362,9 @@ unsafe fn emission_safe(s: &Shared, target: Target) -> bool {
         && (GetAsyncKeyState(VK_SHIFT as i32) < 0) == s.shift_latch.load(Ordering::Acquire)
 }
 unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isize {
+    if let Some(s) = SHARED.get() {
+        s.hook_seen.fetch_add(1, Ordering::Relaxed);
+    }
     if code >= 0
         && matches!(
             msg as u32,
@@ -434,6 +464,14 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
             }
         }
         s.diagnostics.record_input(reason, s.now() as u64);
+        if reason == InputReason::TargetChanged {
+            // The pointer is over a window the last poll has not seen yet.
+            // Look it up now so only this notch passes through unsmoothed.
+            let ui = s.ui.load(Ordering::Acquire);
+            if ui != 0 {
+                PostMessageW(ui as HWND, REFRESH, 0, 0);
+            }
+        }
         s.update_input_ui();
         if !accepted {
             // Fine/OS-generated input, modifiers and bypasses interrupt our existing tail.
@@ -524,8 +562,12 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
                         e.clear();
                     }
                     for (axis, amount) in queued.into_iter().enumerate() {
-                        if amount != 0 {
-                            e.push_tuned(s.now(), amount, axis == 1, target.hwnd, target.tuning);
+                        // The hook already swallowed this notch. If the engine
+                        // refuses it, send it as it is rather than lose it.
+                        if amount != 0
+                            && !e.push_tuned(s.now(), amount, axis == 1, target.hwnd, target.tuning)
+                        {
+                            send_wheel(amount, axis == 1);
                         }
                     }
                     let values = e.tick(s.now(), target.hwnd);
@@ -597,6 +639,9 @@ impl Runtime {
                 epoch: Instant::now(),
                 hook_thread: AtomicU32::new(0),
                 hook_live: AtomicBool::new(false),
+                hook_seen: AtomicU64::new(0),
+                watch_cursor: AtomicU64::new(0),
+                watch_seen: AtomicU64::new(0),
                 sent: AtomicU64::new(0),
                 ticks: AtomicU64::new(0),
                 hook_max_us: AtomicU64::new(0),
@@ -622,16 +667,24 @@ impl Runtime {
                 PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_NOREMOVE);
                 hs.hook_thread
                     .store(GetCurrentThreadId(), Ordering::Release);
-                let h =
-                    SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), GetModuleHandleW(null()), 0);
-                hs.hook_live.store(!h.is_null(), Ordering::Release);
-                let _ = tx.send(!h.is_null());
+                let install = || {
+                    SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), GetModuleHandleW(null()), 0)
+                };
+                let mut h = install();
+                let installed = !h.is_null();
+                hs.hook_live.store(installed, Ordering::Release);
+                let _ = tx.send(installed);
+                while !h.is_null() && GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {
+                    if message.message == REHOOK {
+                        UnhookWindowsHookEx(h);
+                        h = install();
+                    }
+                }
                 if !h.is_null() {
-                    while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {}
                     UnhookWindowsHookEx(h);
                 }
                 hs.hook_live.store(false, Ordering::Release);
-                if !h.is_null() && !hs.quitting.load(Ordering::Acquire) {
+                if installed && !hs.quitting.load(Ordering::Acquire) {
                     hs.fail("Mouse hook thread stopped. Smoothing paused; restart Scroll Mage to retry.");
                 }
             });
@@ -847,6 +900,17 @@ mod tests {
                 s.sent.load(Ordering::Relaxed),
                 emitted,
                 "Tagged injected input must pass through once without being re-smoothed."
+            );
+            // A re-installed hook must still see real Windows input.
+            PostThreadMessageW(s.hook_thread.load(Ordering::Acquire), REHOOK, 0, 0);
+            pump(Duration::from_millis(100));
+            assert!(s.hook_live.load(Ordering::Acquire));
+            let seen = s.hook_seen.load(Ordering::Relaxed);
+            assert!(send_wheel(120, false) && send_wheel(-120, false));
+            pump(Duration::from_millis(100));
+            assert!(
+                s.hook_seen.load(Ordering::Relaxed) >= seen + 2,
+                "Re-installed hook must receive input"
             );
             accept_constructed(WM_MOUSEWHEEL, &m);
             let fine = MSLLHOOKSTRUCT {

@@ -1616,6 +1616,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             0
         }
         WM_TIMER if w == 7 => {
+            ui.shared.watch_hook();
             ui.shared.refresh_target();
             if IsWindowVisible(h) != 0 && IsIconic(h) == 0 {
                 ui.update();
