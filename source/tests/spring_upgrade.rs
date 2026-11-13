@@ -1,7 +1,10 @@
 use scrollpilot::{engine::Engine, settings::Settings};
 
+// Default response 30 gives a friction of 15 per second: a notch's remaining
+// distance falls to e^(-15 t) of what it was, and the rest has been sent.
+
 #[test]
-fn wheel_follows_exact_critical_spring_instead_of_restarting_a_pulse() {
+fn wheel_notch_drains_exponentially_from_full_speed() {
     let s = Settings {
         distance: 120.,
         acceleration_max: 1.,
@@ -9,7 +12,7 @@ fn wheel_follows_exact_critical_spring_instead_of_restarting_a_pulse() {
     };
     let mut engine = Engine::default();
     assert!(engine.push(0., 120, false, 1, &s));
-    let expected = (120. * (1. - 4. * (-3f64).exp())).trunc() as i32;
+    let expected = (120. * (1. - (-1.5f64).exp())).trunc() as i32;
     assert_eq!(engine.tick(100., 1)[0], expected);
 }
 
@@ -31,7 +34,7 @@ fn fractional_travel_is_preserved_between_separate_notches() {
 }
 
 #[test]
-fn retargeting_preserves_the_existing_velocity() {
+fn a_second_notch_adds_to_the_motion_already_under_way() {
     let s = Settings {
         acceleration_max: 1.,
         ..Settings::default()
@@ -39,8 +42,8 @@ fn retargeting_preserves_the_existing_velocity() {
     let mut engine = Engine::default();
     engine.push(0., 120, false, 1, &s);
     engine.push(50., 120, false, 1, &s);
-    let expected =
-        (120. * (1. - 4. * (-3f64).exp()) + 120. * (1. - 2.5 * (-1.5f64).exp())).trunc() as i32;
+    // Each notch drains independently from the moment it arrived.
+    let expected = (240. - 120. * (-1.5f64).exp() - 120. * (-0.75f64).exp()).trunc() as i32;
     assert_eq!(engine.tick(100., 1)[0], expected);
 }
 

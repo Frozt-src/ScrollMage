@@ -19,6 +19,10 @@ pub const ACCENT_PRESSED: u32 = 0x722541;
 pub const SELECTED: u32 = 0xf3e4ea;
 pub const AMBER: u32 = 0xf2aa22;
 pub const TEST_OFF_WHITE: u32 = 0xf8f7f5;
+/// Read-only value fields, such as a fixed preset's tuning.
+pub const LOCKED_FIELD: u32 = 0xf3f4f8;
+/// Text and glyphs on controls that cannot be used right now.
+pub const DISABLED: u32 = 0xa3aab8;
 pub fn color(rgb: u32) -> u32 {
     ((rgb & 255) << 16) | (rgb & 0xff00) | ((rgb >> 16) & 255)
 }
@@ -78,6 +82,8 @@ pub struct Fonts {
     pub display: usize,
     pub brand: usize,
     pub number: usize,
+    /// Windows' own icon font, shipped with Windows 10 and 11.
+    pub icon: usize,
 }
 unsafe fn font(face: &str, size: i32, weight: u32, scale: f64) -> usize {
     CreateFontW(
@@ -106,6 +112,7 @@ impl Fonts {
             display: font("Segoe UI Variable Display", 34, 600, scale),
             brand: font("Segoe UI Variable Display", 24, 600, scale),
             number: font("Segoe UI", 14, 400, scale),
+            icon: font("Segoe MDL2 Assets", 16, 400, scale),
         }
     }
 }
@@ -119,6 +126,7 @@ impl Drop for Fonts {
                 self.display,
                 self.brand,
                 self.number,
+                self.icon,
             ] {
                 if h != 0 {
                     DeleteObject(h as HGDIOBJ);

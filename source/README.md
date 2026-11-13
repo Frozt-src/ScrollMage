@@ -2,16 +2,18 @@
 
 ![Scroll Mage: smooth scrolling for Windows](assets/scroll-mage-banner.png)
 
-**Make your mouse wheel feel right.**
+**A scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable.**
 
 I built Scroll Mage because I wanted smoother scrolling on Windows with settings I could actually dial in. Pick a preset, adjust the feel, and leave specific apps alone when their scrolling already works for you.
 
 It lives in the tray, stays out of your way, and gives you a quick way to pause whenever you need it.
 
+Scroll Mage is for desktop mice and does not support touchpads. Precision touchpads send fine-grained scrolling, which Scroll Mage leaves to Windows. Some older touchpad drivers imitate a notched mouse wheel instead; Windows does not tell Scroll Mage which device sent those events, so they may be smoothed like a mouse. Press **Alt + P** to pause if that happens.
+
 ## What it does
 
 - Smooths regular mouse wheel input in supported Windows apps.
-- Lets you adjust scroll distance, spring response, and acceleration.
+- Lets you adjust scroll distance, response, and acceleration.
 - Includes **Default**, **macOS style**, and **Super smooth** presets.
 - Supports horizontal scrolling with **Shift + mouse wheel** and an optional reverse direction.
 - Lets you exclude individual apps by their EXE name or full path.
@@ -46,26 +48,52 @@ Run one scrolling utility at a time so they do not compete for the same input.
 
 ## Dial in the feel
 
-**Distance** controls the scroll amount per wheel notch. **Spring response** controls how quickly the motion catches up. **Acceleration window** and **Maximum acceleration** control how repeated wheel input builds speed. A maximum acceleration of **1** turns acceleration off.
+**Distance** controls the scroll amount per wheel notch. **Response** controls how quickly each scroll eases to a stop: every notch starts at full speed and slows smoothly, and a higher response finishes sooner. **Acceleration window** and **Maximum acceleration** control how repeated wheel input builds speed. A maximum acceleration of **1** turns acceleration off.
 
-The **macOS style** preset is inspired by that feel. It is Scroll Mage's own tuning, not Apple's scrolling engine.
+The **macOS style** preset is inspired by that feel: a soft, longer ease-out, with strong acceleration so slow notches stay precise while a fast spin travels several times further. It is Scroll Mage's own tuning, not Apple's scrolling engine.
 
 **Super smooth** emulates free-spin in software: a quick flick (rapid same-direction notches, or one packet containing several notches) starts a fast coast that gradually slows. Slow individual notches keep their normal distance. Reverse the wheel, click the left, middle, or right mouse button, pause, or change targets to stop the coast. Software cannot remove the physical detents of your wheel or detect your finger touching it. Its coast is independent of the test-friction control.
 
 **Test momentum friction** and **Test elastic response** affect dragging inside Scroll Test. They do not add momentum or elastic edges to every Windows app. Each app still controls how it displays incoming scrolling, so the result can vary.
 
-Browsers are excluded by default. Remove their entries if you want Scroll Mage to handle their wheel scrolling too.
+Browsers are smoothed like any other app. Apps that scroll in whole lines, such as File Explorer and many older Windows programs, collect small wheel movements into line-sized steps, so they look less smooth than browsers, Office or code editors.
 
 ## Local and straightforward
 
-Scroll Mage runs locally. Your settings stay in `settings.json` beside the executable. There is no account, activation system, or built-in updater.
+Scroll Mage runs locally. Your settings stay in `settings.json` beside the executable, so keep the app in a folder you can write to. There is no account, activation system, telemetry, or built-in updater, and the app contains no networking code.
 
-The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
+To smooth scrolling, Scroll Mage reads mouse wheel events through a Windows low-level mouse hook and sends smoothed wheel events in their place. It runs without administrator rights and leaves apps that run as administrator alone. [SECURITY.md](../SECURITY.md) describes exactly what it touches.
 
-The local **0.6.10 candidate** contains production-audit fixes and repeatable validation/packaging tools. It is not published or a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md).
+The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). Builds are not code-signed yet, so Windows SmartScreen may warn on first run; check your download against the SHA-256 checksum published with the release. See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
+
+The **0.6.10 candidate** is available as a [prerelease](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.10-candidate.1) for acceptance testing. It contains production-audit fixes and repeatable validation/packaging tools, and is not a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md).
+
+## Known limitations
+
+- Touchpads are not supported, by design. Mouse wheels in a high-resolution mode that sends less than one notch at a time pass through unsmoothed.
+- The interface uses a fixed light theme and does not yet follow Windows High Contrast.
+- Each app decides how it draws incoming scrolling, so results vary between apps.
+
+## Build from source
+
+You need 64-bit Windows, Rust (the version is pinned in `rust-toolchain.toml`), the Microsoft C++ build tools and a Windows SDK.
+
+```powershell
+./tools/Validate.ps1
+```
+
+```powershell
+./tools/Package.ps1
+```
+
+The first command checks formatting, lints and runs the tests. The second builds a portable ZIP under `dist/`. [BUILD.md](../BUILD.md) covers manual builds and release checks.
+
+## Contributing
+
+Bug reports and pull requests are welcome. Start with [CONTRIBUTING.md](../CONTRIBUTING.md), and report security problems privately as described in [SECURITY.md](../SECURITY.md).
 
 ## License
 
-Scroll Mage is proprietary and closed source. All rights reserved.
+Scroll Mage's code is open source under the [MIT License](LICENSE). Its artwork is licensed under [CC BY 4.0](../LICENSE-ARTWORK.md).
 
-See [LICENSE](LICENSE) for the project terms and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the licenses and notices that apply to bundled third-party components.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists the licenses and notices that apply to bundled third-party components.

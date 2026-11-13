@@ -1,0 +1,39 @@
+name: Bug report
+description: Scrolling feels wrong, an app misbehaves, or something in Scroll Mage is broken.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Scroll Mage version
+      description: Shown in the sidebar and on the About page.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+      placeholder: Windows 11 24H2 (26100.xxxx)
+    validations:
+      required: true
+  - type: input
+    id: mouse
+    attributes:
+      label: Mouse model
+  - type: input
+    id: app
+    attributes:
+      label: App you were scrolling in
+      description: Include its version if you know it.
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened
+      description: Steps to reproduce, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: activity
+    attributes:
+      label: Activity page text
+      description: Paste or screenshot the Activity page, and name the preset, profile or exclusion involved.

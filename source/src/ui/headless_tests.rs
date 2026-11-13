@@ -224,7 +224,7 @@ fn hidden_native_app_profiles_save_without_committing_global_drafts() {
         );
         SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
         let saved = settings::load(&ui.path).unwrap();
-        assert_eq!(saved.for_app("Editor.exe").omega, 18.);
+        assert_eq!(saved.for_app("Editor.exe").omega, SMOOTH_OMEGA);
         assert_eq!(IsWindowEnabled(ui.handle(3004) as HWND), 0);
         SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3007, 0);
         assert!(settings::load(&ui.path).unwrap().profiles.is_empty());
@@ -283,7 +283,7 @@ fn hidden_native_fixed_presets_apply_and_default_remembers_custom_tuning() {
             ui.shared.settings.read().unwrap().preset,
             Preset::SuperSmooth
         );
-        assert_eq!(settings::load(&ui.path).unwrap().omega, 18.);
+        assert_eq!(settings::load(&ui.path).unwrap().omega, SMOOTH_OMEGA);
         assert!(ui.shared.settings.read().unwrap().wheel().free_spin);
         assert!(text(ui.handle(1110)).contains("Flick to coast"));
         assert!(!ui.shared.settings.read().unwrap().reverse);
@@ -324,6 +324,9 @@ fn hidden_native_failed_preset_save_keeps_the_active_preset() {
     }
 }
 
+/// Super smooth's fixed response, as the preset table defines it.
+const SMOOTH_OMEGA: f64 = 12.;
+
 unsafe fn shared() -> Arc<Shared> {
     Arc::new(Shared {
         settings: RwLock::new(Settings::default()),
@@ -336,6 +339,7 @@ unsafe fn shared() -> Arc<Shared> {
         pad: AtomicUsize::new(0),
         latch: AtomicUsize::new(0),
         shift_latch: AtomicBool::new(false),
+        queued: Default::default(),
         wake: Handle(0),
         epoch: std::time::Instant::now(),
         hook_thread: AtomicU32::new(0),
@@ -343,6 +347,9 @@ unsafe fn shared() -> Arc<Shared> {
         sent: AtomicU64::new(0),
         ticks: AtomicU64::new(0),
         hook_max_us: AtomicU64::new(0),
+        hook_seen: AtomicU64::new(0),
+        watch_cursor: AtomicU64::new(0),
+        watch_seen: AtomicU64::new(0),
         fault: Mutex::new(String::new()),
         diagnostics: scrollpilot::diagnostics::Diagnostics::default(),
     })
@@ -1001,13 +1008,13 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
                 PRESET as usize | ((CBN_SELENDOK as usize) << 16),
                 combo as isize,
             );
-            assert_eq!(text(ui.inputs[1]), "18");
+            assert_eq!(text(ui.inputs[1]), SMOOTH_OMEGA.to_string());
             assert_eq!(ui.preset, Preset::SuperSmooth);
-            assert_eq!(ui.shared.settings.read().unwrap().omega, 18.); // Fixed presets auto-apply.
+            assert_eq!(ui.shared.settings.read().unwrap().omega, SMOOTH_OMEGA); // Fixed presets auto-apply.
             ui.apply();
             let saved = settings::load(&ui.path).unwrap();
             assert_eq!(saved.preset, Preset::SuperSmooth);
-            assert_eq!(saved.omega, 18.);
+            assert_eq!(saved.omega, SMOOTH_OMEGA);
             assert_eq!(saved.exclusions, Settings::default().exclusions);
             std::fs::remove_file(&ui.path).unwrap();
             SendMessageW(combo, CB_SETCURSEL, 0, 0);

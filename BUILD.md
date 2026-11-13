@@ -1,6 +1,6 @@
 # Building Scroll Mage
 
-Scroll Mage is a proprietary Windows desktop application. This repository is private. The LICENSE and third-party notices apply to the corresponding project files and components.
+Scroll Mage is an open-source Windows desktop application. Code is under the MIT License in LICENSE, artwork under CC BY 4.0 in LICENSE-ARTWORK.md, and third-party components under the licenses listed in THIRD_PARTY_NOTICES.md.
 
 ## Requirements
 
@@ -54,4 +54,4 @@ With existing Scroll Mage instances closed, run `./tools/Test-Candidate.ps1 -Exe
 
 Downloadable binaries belong in GitHub Releases. The 0.6.9 release ZIP contains the executable, icon, README, banner image, startup instructions, a portable paused launcher, third-party license files, and per-file checksums. Publish its ZIP checksum beside the archive; release notes and CHANGELOG.md describe the changes.
 
-The package excludes source code and personal settings. Preserve LICENSE, THIRD_PARTY_NOTICES.md, and vendor-licenses with redistributed copies. The current build is unsigned.
+The package excludes source code and personal settings. Preserve LICENSE, LICENSE-ARTWORK.md, THIRD_PARTY_NOTICES.md, and vendor-licenses with redistributed copies. The current build is unsigned.

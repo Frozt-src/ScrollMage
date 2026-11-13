@@ -211,7 +211,7 @@ fn legacy_fixed_preset_is_canonical_and_preserves_manual_tuning() {
     let json: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
     assert_eq!(json["preset"], "macos_style");
     assert_eq!(json["distance"], 120.0);
-    assert_eq!(json["omega"], 24.0);
+    assert_eq!(json["omega"], Preset::MacosStyle.tuning().omega);
     assert_eq!(json["default_tuning"]["distance"], 156.0);
     assert_eq!(json["default_tuning"]["omega"], 26.0);
     assert_eq!(json["reverse"], true);
@@ -335,7 +335,7 @@ fn fixed_profiles_use_full_canonical_wheel_tuning_and_roundtrip() {
     let loaded = load(&p).unwrap();
     assert_eq!(loaded.profiles[0].preset, Some(Preset::MacosStyle));
     assert_eq!(loaded.profiles[0].distance, 120.);
-    assert_eq!(loaded.profiles[0].omega, 24.);
+    assert_eq!(loaded.profiles[0].omega, Preset::MacosStyle.tuning().omega);
     assert_eq!(loaded.for_app("editor.exe"), canonical.wheel());
     s.profiles[0].bypass = true;
     assert_eq!(s.for_app("editor.exe"), s.wheel());

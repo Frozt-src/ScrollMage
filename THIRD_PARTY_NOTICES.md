@@ -1,6 +1,6 @@
 # Third-party notices
 
-Scroll Mage's original code, documentation, and original visual assets are proprietary and closed source under LICENSE. This does not change the licenses or copyright notices of third-party components.
+Scroll Mage's original code and documentation are licensed under the MIT License in LICENSE, and its original artwork under CC BY 4.0 as described in LICENSE-ARTWORK.md. This does not change the licenses or copyright notices of third-party components.
 
 Pinned dependencies are listed in source/Cargo.lock; candidate ZIPs include DEPENDENCIES.json with their versions. Unmodified copies of upstream license and copyright files are included under source/vendor-licenses/ in the repository and vendor-licenses/ beside the packaged executable, by exact package version. These include the dependencies' MIT, Apache, Unicode, Boost, and other applicable license and copyright files. They apply to the corresponding third-party components, not to Scroll Mage's original code.
 

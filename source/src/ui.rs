@@ -1,4 +1,5 @@
 mod actions;
+mod activity;
 mod app_icons;
 mod backdrop;
 mod control_motion;
@@ -324,7 +325,7 @@ impl Ui {
         );
         let labels = [
             "Distance",
-            "Spring response",
+            "Response",
             "Acceleration window",
             "Maximum acceleration",
             "Test momentum friction",
@@ -427,10 +428,9 @@ impl Ui {
         self.shared.pad.store(self.pad, Ordering::Release);
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
-        self.static_text("Version 0.6.10 candidate\r\n\r\nScroll Mage adjusts mouse wheel motion on your PC. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit.",1121,true,self.fonts.body);
+        self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage is a scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable. It is built for desktop mice; touchpad scrolling is left to Windows. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
         self.build_profiles();
-        self.static_text("Scrolling activity", 3110, true, self.fonts.section);
-        self.static_text("", 3111, true, self.fonts.body);
+        self.build_activity();
         self.ready = true;
         self.loading_controls = false;
         self.sync_preset_controls();
@@ -514,7 +514,7 @@ impl Ui {
         } else if self.view == NAV_PROFILES {
             720
         } else if self.view == NAV_ACTIVITY {
-            520
+            self.activity_layout().height
         } else {
             shell.body.h
         };
@@ -602,8 +602,7 @@ impl Ui {
         } else if self.view == NAV_PROFILES {
             self.layout_profiles();
         } else if self.view == NAV_ACTIVITY {
-            self.at(3110, Rect::new(20, 20 - self.scroll, w - 40, 32));
-            self.at(3111, Rect::new(20, 70 - self.scroll, w - 40, 430));
+            self.layout_activity(&self.activity_layout());
         } else {
             self.at(1120, Rect::new(32, 30, w - 80, 46));
             self.at(
@@ -622,7 +621,7 @@ impl Ui {
         let (title, copy) = self.shared.status_text();
         set(self.status_title, &title);
         set(self.status, copy.lines().next().unwrap_or(""));
-        set(self.handle(3111), &format!("{title}\r\n\r\n{copy}\r\n\r\nPoint at an app and scroll to see whether its input is accepted or passed through. Counters show this session's activity, not visible frame rate.\r\n\r\nFine-resolution and external injected input pass through. Other apps decide whether small wheel events produce pixel movement or line steps.\r\n\r\nSuper smooth adds a fast coast after a quick wheel flick. Reverse, click or pause to stop it. Momentum friction and elastic response belong to dragging in Scroll Test. Ordinary wheel output cannot read another app's content bounds or add elastic edges."));
+        self.update_activity(&title, &copy);
         set(
             self.toggle,
             if enabled {
@@ -742,7 +741,7 @@ impl Ui {
             self.scale,
             self.fonts.small,
             MUTED,
-            "Version 0.6.10 candidate",
+            concat!("Version ", env!("CARGO_PKG_VERSION")),
             DT_SINGLELINE,
         );
     }
@@ -761,6 +760,7 @@ impl Ui {
                 round(dc, c, 4, self.scale, WHITE, Some(BORDER));
             }
             let c = cards[0];
+            let locked = self.preset.fixed();
             for i in 0..6 {
                 let y = c.y + FORM_ROW_START + i * FORM_ROW_GAP + if i >= 4 { 8 } else { 0 }
                     - self.scroll;
@@ -769,7 +769,7 @@ impl Ui {
                     Rect::new(c.x + c.w - 124, y, 104, 36),
                     4,
                     self.scale,
-                    WHITE,
+                    if locked { LOCKED_FIELD } else { WHITE },
                     Some(if GetFocus() == self.inputs[i as usize] as HWND {
                         ACCENT
                     } else {
@@ -815,6 +815,8 @@ impl Ui {
                     BORDER
                 }),
             );
+        } else if self.view == NAV_ACTIVITY {
+            self.paint_activity(dc);
         } else {
             round(
                 dc,
@@ -1082,13 +1084,19 @@ impl Ui {
                 );
             }
             let tint = if selected { ACCENT_TEXT } else { MUTED };
-            let glyph = if id == NAV_SETTINGS { "⚙" } else { "☷" };
+            // Segoe MDL2 Assets: Setting, AllApps, Diagnostic, Info.
+            let glyph = match id {
+                NAV_SETTINGS => "\u{E713}",
+                NAV_PROFILES => "\u{E71D}",
+                NAV_ACTIVITY => "\u{E9D9}",
+                _ => "\u{E946}",
+            };
             if w >= 140 {
                 label(
                     dc,
                     Rect::new(16, 0, 28, height),
                     self.scale,
-                    self.fonts.section,
+                    self.fonts.icon,
                     tint,
                     glyph,
                     DT_SINGLELINE | DT_VCENTER | DT_CENTER,
@@ -1109,22 +1117,27 @@ impl Ui {
                 DT_SINGLELINE | DT_VCENTER,
             );
         } else if (400..412).contains(&id) {
-            round(
-                dc,
-                Rect::new(0, 2, w, height - 2),
-                4,
-                self.scale,
-                0xd8dbe5,
-                None,
-            );
-            round(
-                dc,
-                Rect::new(0, if pressed { 2 } else { 0 }, w, height - 2),
-                4,
-                self.scale,
-                if pressed { SELECTED } else { 0xf3f4f8 },
-                if focused { Some(ACCENT) } else { None },
-            );
+            let enabled = IsWindowEnabled(h) != 0;
+            let pressed = pressed && enabled;
+            if enabled {
+                round(
+                    dc,
+                    Rect::new(0, 2, w, height - 2),
+                    4,
+                    self.scale,
+                    0xd8dbe5,
+                    None,
+                );
+                round(
+                    dc,
+                    Rect::new(0, if pressed { 2 } else { 0 }, w, height - 2),
+                    4,
+                    self.scale,
+                    if pressed { SELECTED } else { 0xf3f4f8 },
+                    if focused { Some(ACCENT) } else { None },
+                );
+            }
+            let glyph = if enabled { MUTED } else { DISABLED };
             let up = (id - 400).is_multiple_of(2);
             let center = w / 2;
             let top = height / 2 + if pressed { 2 } else { 0 };
@@ -1135,7 +1148,7 @@ impl Ui {
                 center,
                 if up { top - 1 } else { top + 1 },
                 self.scale,
-                MUTED,
+                glyph,
                 1,
             );
             line(
@@ -1145,11 +1158,22 @@ impl Ui {
                 center + 3,
                 if up { top + 2 } else { top - 2 },
                 self.scale,
-                MUTED,
+                glyph,
                 1,
             );
+        } else if id == APPLY && IsWindowEnabled(h) == 0 {
+            // Nothing to apply: show a quiet confirmation, not a dead button.
+            label(
+                dc,
+                Rect::new(8, 0, w - 16, height),
+                self.scale,
+                self.fonts.body,
+                MUTED,
+                &format!("\u{2713}  {caption}"),
+                DT_SINGLELINE | DT_VCENTER | DT_CENTER,
+            );
         } else {
-            let primary = id == TOGGLE;
+            let primary = id == TOGGLE || id == APPLY;
             round(
                 dc,
                 Rect::new(0, 0, w, height),
@@ -1247,7 +1271,8 @@ unsafe extern "system" fn static_label(
             || id == 903
             || id == 904
             || (1010..1016).contains(&id)
-            || (1110..1116).contains(&id);
+            || (1110..1116).contains(&id)
+            || activity::muted(id);
         let rect = Rect::new(
             0,
             0,
@@ -1417,6 +1442,17 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
     }
     if msg == WM_CTLCOLORSTATIC {
         let id = GetDlgCtrlID(l as HWND) as u16;
+        if (201..207).contains(&id) || id == 215 {
+            // Disabled and read-only edits ask for static colours. They must
+            // paint an opaque background, or each new value is drawn over the
+            // old one.
+            static LOCKED: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+            let brush = *LOCKED.get_or_init(|| CreateSolidBrush(color(LOCKED_FIELD)) as usize);
+            SetTextColor(w as HDC, color(MUTED));
+            SetBkMode(w as HDC, OPAQUE as i32);
+            SetBkColor(w as HDC, color(LOCKED_FIELD));
+            return Some(brush as isize);
+        }
         SetTextColor(
             w as HDC,
             color(
@@ -1425,6 +1461,7 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
                     || id == 904
                     || (1010..1016).contains(&id)
                     || (1110..1116).contains(&id)
+                    || activity::muted(id)
                 {
                     MUTED
                 } else {
@@ -1479,7 +1516,8 @@ unsafe extern "system" fn body(h: HWND, msg: u32, w: usize, l: isize) -> isize {
         }
         WM_MOUSEWHEEL => {
             let delta = ((w >> 16) as u16 as i16) as i32;
-            ui.scroll -= delta / 120 * 72;
+            // Multiply first: high-resolution wheels send deltas below one notch.
+            ui.scroll -= delta * 72 / 120;
             ui.layout();
             0
         }
@@ -1578,6 +1616,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             0
         }
         WM_TIMER if w == 7 => {
+            ui.shared.watch_hook();
             ui.shared.refresh_target();
             if IsWindowVisible(h) != 0 && IsIconic(h) == 0 {
                 ui.update();
@@ -1608,20 +1647,22 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             ui.refresh_icons();
             presets::style_popup(ui.handle(PRESET) as HWND, ui.scale);
             let old_fonts = std::mem::replace(&mut ui.fonts, Fonts::new(ui.scale));
-            for &(id, control, _) in &ui.controls {
-                let font = if id == 900 {
-                    ui.fonts.display
-                } else if id == 1120 {
-                    ui.fonts.brand
-                } else if id == 902 || (1100..1105).contains(&id) {
-                    ui.fonts.section
-                } else if (201..207).contains(&id) {
-                    ui.fonts.number
-                } else if id == 904 || (1010..1016).contains(&id) || (1110..1116).contains(&id) {
-                    ui.fonts.small
-                } else {
-                    ui.fonts.body
-                };
+            // Map each control's current font to its rescaled equivalent, so the
+            // role chosen at creation survives every DPI change.
+            let roles = [
+                (old_fonts.body, ui.fonts.body),
+                (old_fonts.small, ui.fonts.small),
+                (old_fonts.section, ui.fonts.section),
+                (old_fonts.display, ui.fonts.display),
+                (old_fonts.brand, ui.fonts.brand),
+                (old_fonts.number, ui.fonts.number),
+            ];
+            for &(_, control, _) in &ui.controls {
+                let current = SendMessageW(control as HWND, WM_GETFONT, 0, 0) as usize;
+                let font = roles
+                    .iter()
+                    .find(|(old, _)| *old == current)
+                    .map_or(ui.fonts.body, |(_, new)| *new);
                 SendMessageW(control as HWND, WM_SETFONT, font, 1);
             }
             for (id, row_height) in [(PRESET, 32), (3003, 28)] {
@@ -2009,6 +2050,10 @@ pub fn single_instance() -> Result<Handle, String> {
         if GetLastError() == ERROR_ALREADY_EXISTS {
             let window = FindWindowW(wide("ScrollPilot.Main").as_ptr(), null());
             if !window.is_null() {
+                // Let the running instance take the foreground when it restores.
+                let mut pid = 0;
+                GetWindowThreadProcessId(window, &mut pid);
+                AllowSetForegroundWindow(pid);
                 PostMessageW(window, RESTORE, 0, 0);
             }
             return Err("Scroll Mage is already running.".into());

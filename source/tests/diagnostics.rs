@@ -39,7 +39,7 @@ fn bypass_reasons_and_tagged_emissions_are_counted_separately() {
     d.record_input(InputReason::Tagged, 22);
     assert_eq!(d.status_text(true, true, "", 23).0, "Smoothing");
     for (reason, text) in [
-        (InputReason::Precision, "Precision wheel delta"),
+        (InputReason::Precision, "Touchpad or fine wheel input"),
         (InputReason::Modifiers, "Modifier/button held"),
         (InputReason::ExternalInjected, "Externally injected input"),
         (InputReason::TargetChanged, "Target changed"),

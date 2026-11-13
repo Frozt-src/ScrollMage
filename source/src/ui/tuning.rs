@@ -50,14 +50,11 @@ impl Ui {
             .any(|(input, value)| text(*input).trim().parse::<f64>() != Ok(value));
         set(
             self.handle(1110),
-            if self.preset == Preset::SuperSmooth {
-                "Fixed. Flick to coast."
-            } else if self.preset.fixed() {
-                "Fixed. Already active."
-            } else if custom {
-                "Custom Default tuning."
-            } else {
-                "Editable. Apply to save."
+            match self.preset {
+                Preset::SuperSmooth => "Softest glide. Flick to coast.",
+                Preset::MacosStyle => "Soft glide, faster as you spin.",
+                Preset::Default if custom => "Custom Default tuning.",
+                Preset::Default => "Crisp and precise. Editable.",
             },
         );
     }

@@ -36,8 +36,11 @@ impl Preset {
         let [distance, omega, acceleration_ms, acceleration_max, friction, elastic_omega] =
             match self {
                 Self::Default => [120., 30., 70., 1., 4., 22.],
-                Self::MacosStyle => [120., 24., 100., 1.5, 4.5, 24.],
-                Self::SuperSmooth => [120., 18., 100., 1., 5., 20.],
+                // Soft, long ease-out with strong speed-based acceleration:
+                // slow notches stay precise, fast spins travel much further.
+                Self::MacosStyle => [120., 14., 140., 4., 4.5, 24.],
+                // The softest ease-out, plus free-spin glide after a flick.
+                Self::SuperSmooth => [120., 12., 100., 1., 5., 20.],
             };
         Tuning {
             distance,
@@ -75,7 +78,7 @@ impl Tuning {
     fn validate(self) -> Result<(), String> {
         for (label, value, min, max) in [
             ("Distance", self.distance, 1., 960.),
-            ("Spring response", self.omega, 10., 80.),
+            ("Response", self.omega, 10., 80.),
             ("Acceleration window", self.acceleration_ms, 10., 500.),
             ("Maximum acceleration", self.acceleration_max, 1., 10.),
             ("Preview friction", self.friction, 1., 12.),
@@ -128,10 +131,9 @@ impl Default for Settings {
             elastic_omega: 22.,
             reverse: false,
             horizontal: true,
-            exclusions: ["Diablo IV.exe", "firefox.exe", "chrome.exe", "msedge.exe"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
+            // Browsers render fine-grained wheel input smoothly, so they are
+            // smoothed by default like every other app.
+            exclusions: vec!["Diablo IV.exe".into()],
             profiles: Vec::new(),
             incompatible_processes: Vec::new(),
         }

@@ -1,10 +1,8 @@
 name: Windows quality
 
+# Manual only: Windows runners on a private repository use paid Actions minutes.
+# Run locally with ./tools/Validate.ps1, or start this from the Actions tab.
 on:
-  push:
-    branches: [main, 'codex/**']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

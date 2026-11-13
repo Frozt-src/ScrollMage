@@ -21,14 +21,19 @@ impl Ui {
 
     pub(super) unsafe fn rebuild_exclusions(&mut self) {
         self.exclusion_generation = self.exclusion_generation.wrapping_add(1);
-        self.controls.retain(|&(id, h, _)| {
-            if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) {
-                DestroyWindow(h as HWND);
-                false
-            } else {
-                true
-            }
-        });
+        // Remove the rows from the list before destroying them: DestroyWindow
+        // re-enters this window's procedures, which read `controls`.
+        let is_row = |id: u16| (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id);
+        let rows: Vec<usize> = self
+            .controls
+            .iter()
+            .filter(|&&(id, _, _)| is_row(id))
+            .map(|&(_, h, _)| h)
+            .collect();
+        self.controls.retain(|&(id, _, _)| !is_row(id));
+        for h in rows {
+            DestroyWindow(h as HWND);
+        }
         for (i, name) in self.excluded_apps.clone().into_iter().enumerate() {
             let label =
                 self.static_text(&name, EXCLUSION_ROW + i as u16 * 2, true, self.fonts.small);
@@ -225,7 +230,7 @@ pub(super) unsafe extern "system" fn panel(h: HWND, msg: u32, w: usize, l: isize
         }
         WM_MOUSEWHEEL => {
             let delta = ((w >> 16) as u16 as i16) as i32;
-            ui.exclusion_scroll -= delta / 120 * 32;
+            ui.exclusion_scroll -= delta * 32 / 120;
             ui.layout_exclusions();
             0
         }
