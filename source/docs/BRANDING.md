@@ -18,7 +18,7 @@ The user-supplied reference is preserved byte for byte as assets/brand/logo-dire
 - lockup-sidebar*.png: previews at sidebar sizes, including 168 by 64 and 160 by 64.
 - lockup-validation.json: export checks and source provenance.
 
-The larger sidebar logo is removed; the title bar contains the only logo. Historical scroll-only font/artwork files remain for provenance; they are not used to draw the current title-bar logo. This is a custom logo, not a complete installable font alphabet.
+The larger sidebar logo is removed; the title bar contains the only logo. Historical scroll-only font/artwork files remain for provenance; they are not used to draw the current title-bar logo. The scroll wordmark exporter and font builder that produced them were removed in 0.7.0, so those files are no longer regenerated. This is a custom logo, not a complete installable font alphabet.
 
 ## Rebuild and verification
 

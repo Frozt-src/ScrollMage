@@ -21,4 +21,4 @@ Execution rulings: Default selection restores the user's stored editable tuning 
 
 Ownership: settings/tests, native runtime/diagnostics, and UI/integration have separate writers. Review settings and runtime changes against this contract before integration, then review the complete change and validation evidence. Audit scratch files remain ignored.
 
-Completed on local branch `codex/profiles-and-scroll-diagnostics`. See [validation](VALIDATION-0.6.8.md) for the review artifact, passed checks and outstanding live acceptance checks. No release was published.
+Completed on a local branch. See [validation](VALIDATION-0.6.8.md) for the review artifact, passed checks and outstanding live acceptance checks. No release was published.

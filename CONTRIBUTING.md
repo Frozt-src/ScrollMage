@@ -10,10 +10,10 @@ Open an issue and include:
 
 - Scroll Mage version (shown in the sidebar and on the About page) and Windows build.
 - Mouse model, and the app you were scrolling in.
-- The selected preset, any app profile or exclusion involved, and the text shown on the **Activity** page.
+- The selected preset, and any app profile or exclusion involved.
 - The exact steps, what you expected and what happened.
 
-Scrolling feel depends on the receiving app, so the Activity text matters: it tells us whether input was bypassed, or was accepted and then rendered in steps by the app.
+Scrolling feel depends on the receiving app, so name the app and its version.
 
 Please report security problems privately. See [SECURITY.md](SECURITY.md).
 

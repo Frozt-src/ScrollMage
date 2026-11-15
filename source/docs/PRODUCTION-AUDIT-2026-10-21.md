@@ -2,7 +2,7 @@
 
 Verified October 21, 2026. **Verdict: improved release candidate, not yet production-approved and not feature-equivalent to SmoothScroll.**
 
-Audited local `main` baseline the `v0.6.9` tag (published 0.6.9), then made original fixes on `codex/production-readiness-audit` as 0.6.10 candidate. No published release or running app was replaced. No Scroll Mage process was found during the process-name check. The root executable, personal settings and published 0.6.9 ZIP retain their original hashes.
+Audited local `main` baseline the `v0.6.9` tag (published 0.6.9), then made original fixes on a local branch as 0.6.10 candidate. No published release or running app was replaced. No Scroll Mage process was found during the process-name check. The root executable, personal settings and published 0.6.9 ZIP retain their original hashes.
 
 ## Method and reference boundary
 

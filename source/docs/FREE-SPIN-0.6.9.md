@@ -62,4 +62,4 @@ Local evidence: `source/evidence/0.6.9-native-verification.json`, `0.6.9-pe-revi
 
 All 38 hashes listed in the ZIP were verified. No personal settings, source files or PDBs are included. The local staged folder received a separate settings copy after packaging, with Super smooth selected and the original Diablo IV exclusion retained. That local settings copy is intentionally outside the ZIP hash list. Quit the existing tray instance before opening the review executable, so the single-instance guard does not bring the old copy forward.
 
-The original root executable and settings, the published 0.6.7 ZIP, and the previous 0.6.8 review ZIP are preserved. The running app was not replaced or restarted, and no GitHub release was published. Source changes remain local on `codex/profiles-and-scroll-diagnostics`.
+The original root executable and settings, the published 0.6.7 ZIP, and the previous 0.6.8 review ZIP are preserved. The running app was not replaced or restarted, and no GitHub release was published. Source changes remain on a local branch.
