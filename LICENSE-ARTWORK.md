@@ -13,7 +13,7 @@ Copyright (c) 2026 Frozt and Scroll Mage contributors.
 - `graphics/`: the mouse emblem, application icon and logo source packages.
 - `ScrollMage.ico`.
 - The same artwork where it is embedded in the executable or stored as outline
-  data (for example `assets/brand/lockup-v2.paths.json`).
+  data (for example `source/assets/brand/lockup-v2.paths.json`).
 
 Source code, build scripts and documentation are under the MIT License in
 [LICENSE](LICENSE), not this license.
