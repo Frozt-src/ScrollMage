@@ -17,7 +17,6 @@ pub const ACCENT: u32 = 0x8e3555;
 pub const ACCENT_TEXT: u32 = 0x792a48;
 pub const ACCENT_PRESSED: u32 = 0x722541;
 pub const SELECTED: u32 = 0xf3e4ea;
-pub const AMBER: u32 = 0xf2aa22;
 pub const TEST_OFF_WHITE: u32 = 0xf8f7f5;
 /// Read-only value fields, such as a fixed preset's tuning.
 pub const LOCKED_FIELD: u32 = 0xf3f4f8;

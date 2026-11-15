@@ -31,7 +31,9 @@ impl Ui {
         self.reveal.target(open, animate);
         if animate {
             self.reveal_time = self.shared.now();
-            SetTimer(self.hwnd as HWND, REVEAL_TIMER, 16, None);
+            // Windows timers fire on a ~15.6 ms tick; asking for 16 ms waits two
+            // ticks (~30 ms). Below one tick fires every tick, about 64 frames/s.
+            SetTimer(self.hwnd as HWND, REVEAL_TIMER, 10, None);
         } else {
             KillTimer(self.hwnd as HWND, REVEAL_TIMER);
         }

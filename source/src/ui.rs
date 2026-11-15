@@ -47,7 +47,6 @@ const TRAY: u32 = WM_APP + 3;
 const APPLY: u16 = 101;
 const TOGGLE: u16 = 102;
 const QUIT: u16 = 104;
-const STATUS_SWITCH: u16 = 110;
 const NAV_SETTINGS: u16 = 120;
 const NAV_ABOUT: u16 = 122;
 const EXCLUDE_ADD: u16 = 130;
@@ -66,7 +65,7 @@ const RESET_PREVIEW: u16 = 134;
 struct Ui {
     brand: scrollpilot::brand_lockup::Lockup,
     logo_animated: bool,
-    toggle_motion: [scrollpilot::control_motion::Toggle; 4],
+    toggle_motion: [scrollpilot::control_motion::Toggle; 3],
     toggle_initialized: bool,
     toggle_time: f64,
     reveal: scrollpilot::control_motion::Reveal,
@@ -83,9 +82,6 @@ struct Ui {
     horizontal: usize,
     exclusion_input: usize,
     startup: usize,
-    status: usize,
-    status_title: usize,
-    status_switch: usize,
     toggle: usize,
     pad: usize,
     hwnd: usize,
@@ -162,9 +158,6 @@ impl Ui {
             horizontal: 0,
             exclusion_input: 0,
             startup: 0,
-            status: 0,
-            status_title: 0,
-            status_switch: 0,
             toggle: 0,
             pad: 0,
             hwnd: 0,
@@ -386,9 +379,6 @@ impl Ui {
             true,
         );
         check(self.startup, startup_enabled());
-        self.status_title = self.static_text("", 902, true, self.fonts.section);
-        self.status = self.static_text("", 903, true, self.fonts.small);
-        self.status_switch = self.button("Smoothing", STATUS_SWITCH, true, true);
         self.excluded_apps = opts.exclusions.clone();
         self.static_text("Excluded apps", 1102, true, self.fonts.section);
         self.exclusion_input = self.create(
@@ -558,9 +548,6 @@ impl Ui {
                     Rect::new(c.x + 20, c.y + 48 + i as i32 * 44, c.w - 40, 44),
                 );
             }
-            self.at(902, Rect::new(c.x + 54, c.y + 204, c.w - 160, 24));
-            self.at(903, Rect::new(c.x + 54, c.y + 232, c.w - 74, 32));
-            self.at(STATUS_SWITCH, Rect::new(c.x + c.w - 99, c.y + 196, 80, 42));
             let (entry, add) = shell.exclusion_entry();
             self.at(
                 215,
@@ -601,9 +588,6 @@ impl Ui {
     }
     unsafe fn update(&self) {
         let enabled = self.shared.enabled.load(Ordering::Acquire);
-        let (title, copy) = self.shared.status_text();
-        set(self.status_title, &title);
-        set(self.status, copy.lines().next().unwrap_or(""));
         set(
             self.toggle,
             if enabled {
@@ -612,7 +596,6 @@ impl Ui {
                 "Enable smoothing"
             },
         );
-        check(self.status_switch, enabled);
         self.update_pending();
         InvalidateRect(self.hwnd as HWND, null(), 0);
         InvalidateRect(self.toggle as HWND, null(), 0);
@@ -761,30 +744,6 @@ impl Ui {
                     }),
                 );
             }
-            let c = cards[1];
-            let y = c.y - self.scroll;
-            line(
-                dc,
-                c.x + 20,
-                y + 192,
-                c.x + c.w - 20,
-                y + 192,
-                self.scale,
-                BORDER,
-                1,
-            );
-            round(
-                dc,
-                Rect::new(c.x + 20, y + 207, 23, 23),
-                12,
-                self.scale,
-                if self.shared.enabled.load(Ordering::Acquire) {
-                    ACCENT
-                } else {
-                    AMBER
-                },
-                None,
-            );
             let (mut entry, _) = shell.exclusion_entry();
             entry.y -= self.scroll;
             round(
@@ -967,7 +926,7 @@ impl Ui {
         } else {
             text(h as usize)
         };
-        let is_toggle = [212, 213, 214, STATUS_SWITCH].contains(&id);
+        let is_toggle = [212, 213, 214].contains(&id);
         if [WINDOW_MINIMIZE, WINDOW_MAXIMIZE, WINDOW_CLOSE].contains(&id) {
             self.paint_caption_button(h, dc, id, w, height, pressed);
         } else if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) && id % 2 == 1 {
@@ -985,10 +944,7 @@ impl Ui {
             line(dc, x + 4, y - 4, x - 4, y + 4, self.scale, MUTED, 1);
         } else if is_toggle {
             let on = checked(h as usize);
-            let index = [212, 213, 214, STATUS_SWITCH]
-                .iter()
-                .position(|&v| v == id)
-                .unwrap();
+            let index = [212, 213, 214].iter().position(|&v| v == id).unwrap();
             let motion = self.toggle_motion[index];
             let progress = if self.toggle_initialized {
                 motion.position()
@@ -1000,7 +956,7 @@ impl Ui {
             } else {
                 0.
             };
-            let top = if id == STATUS_SWITCH { 9 } else { 8 };
+            let top = 8;
             round(
                 dc,
                 Rect::new(1, top, 44, 25),
@@ -1022,37 +978,25 @@ impl Ui {
                 WHITE,
                 None,
             );
-            if id == STATUS_SWITCH {
-                label(
-                    dc,
-                    Rect::new(54, 0, w - 54, height),
-                    self.scale,
-                    self.fonts.body,
-                    MUTED,
-                    if on { "On" } else { "Off" },
-                    DT_SINGLELINE | DT_VCENTER,
-                );
-            } else {
-                let mut lines = caption.lines();
-                label(
-                    dc,
-                    Rect::new(60, 0, w - 60, 24),
-                    self.scale,
-                    self.fonts.body,
-                    INK,
-                    lines.next().unwrap_or(""),
-                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS,
-                );
-                label(
-                    dc,
-                    Rect::new(60, 25, w - 60, 21),
-                    self.scale,
-                    self.fonts.small,
-                    MUTED,
-                    lines.next().unwrap_or(""),
-                    DT_SINGLELINE | DT_END_ELLIPSIS,
-                );
-            }
+            let mut lines = caption.lines();
+            label(
+                dc,
+                Rect::new(60, 0, w - 60, 24),
+                self.scale,
+                self.fonts.body,
+                INK,
+                lines.next().unwrap_or(""),
+                DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS,
+            );
+            label(
+                dc,
+                Rect::new(60, 25, w - 60, 21),
+                self.scale,
+                self.fonts.small,
+                MUTED,
+                lines.next().unwrap_or(""),
+                DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
         } else if is_nav {
             let selected = id == self.view;
             if selected || pressed {
@@ -1384,7 +1328,7 @@ unsafe extern "system" fn button(
     if IsWindow(h) == 0 {
         return result;
     }
-    if msg == BM_SETCHECK && [212, 213, 214, STATUS_SWITCH].contains(&(GetDlgCtrlID(h) as u16)) {
+    if msg == BM_SETCHECK && [212, 213, 214].contains(&(GetDlgCtrlID(h) as u16)) {
         PostMessageW(GetAncestor(h, GA_ROOT), CONTROL_MOTION, 0, 0);
     }
     if matches!(
@@ -1710,7 +1654,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                 {
                     ui.select_preset()
                 }
-                TOGGLE | STATUS_SWITCH => ui.toggle(),
+                TOGGLE => ui.toggle(),
                 NAV_SETTINGS | NAV_ABOUT => ui.navigate((w & 0xffff) as u16),
                 EXCLUDE_ADD => ui.add_exclusion(),
                 id if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) && id % 2 == 1 => {

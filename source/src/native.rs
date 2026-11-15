@@ -148,19 +148,6 @@ impl Shared {
             self.update_ui();
         }
     }
-    pub fn status_text(&self) -> (String, String) {
-        let fault = self
-            .fault
-            .lock()
-            .map(|f| f.clone())
-            .unwrap_or_else(|_| "Engine state unavailable.".into());
-        self.diagnostics.status_text(
-            self.enabled.load(Ordering::Acquire),
-            self.hook_live.load(Ordering::Acquire),
-            &fault,
-            self.now() as u64,
-        )
-    }
     /// Windows can drop a low-level hook without telling its owner. If the
     /// pointer moved since the last call but the hook saw no mouse event, ask
     /// the hook thread to install the hook again. A needless re-install (the

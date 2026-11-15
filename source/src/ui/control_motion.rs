@@ -1,5 +1,5 @@
 use super::*;
-const IDS: [u16; 4] = [212, 213, 214, STATUS_SWITCH];
+const IDS: [u16; 3] = [212, 213, 214];
 
 impl Ui {
     pub(super) unsafe fn snap_toggles(&mut self) {

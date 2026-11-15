@@ -30,6 +30,8 @@ pub const FORM_ROW_GAP: i32 = 38;
 pub const SETTINGS_COLLAPSED: i32 = 80;
 /// Scroll settings card height with every tuning row showing (Custom).
 pub const SETTINGS_EXPANDED: i32 = 320;
+/// Options card: title plus three toggle rows.
+pub const OPTIONS_HEIGHT: i32 = 196;
 /// Card-relative top of tuning row `i`; the two Scroll Test rows sit a little lower.
 pub fn form_row_y(i: i32) -> i32 {
     FORM_ROW_START + i * FORM_ROW_GAP + if i >= 4 { 8 } else { 0 }
@@ -118,23 +120,23 @@ impl Shell {
             let right = w - left - 16;
             [
                 Rect::new(0, 0, left, sh),
-                Rect::new(0, sh + 16, left, 276),
+                Rect::new(0, sh + 16, left, OPTIONS_HEIGHT),
                 Rect::new(left + 16, 0, right, excluded_height),
                 Rect::new(
                     left + 16,
                     excluded_height + 16,
                     right,
                     (self.body.h - excluded_height - 24)
-                        .max(sh + 292 - excluded_height - 16)
+                        .max(sh + 16 + OPTIONS_HEIGHT - excluded_height - 16)
                         .max(280),
                 ),
             ]
         } else {
             [
                 Rect::new(0, 0, w, sh),
-                Rect::new(0, sh + 16, w, 276),
-                Rect::new(0, sh + 308, w, excluded_height),
-                Rect::new(0, sh + 324 + excluded_height, w, 400),
+                Rect::new(0, sh + 16, w, OPTIONS_HEIGHT),
+                Rect::new(0, sh + OPTIONS_HEIGHT + 32, w, excluded_height),
+                Rect::new(0, sh + OPTIONS_HEIGHT + 48 + excluded_height, w, 400),
             ]
         }
     }

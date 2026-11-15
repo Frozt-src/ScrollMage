@@ -30,8 +30,8 @@ impl Toggle {
 }
 
 /// Height of the Scroll settings card: 0 shows only the preset row, 1 shows
-/// every tuning row. Opening glides in and settles with a barely visible
-/// give; closing is critically damped so it never cuts into the preset row.
+/// every tuning row. Critically damped both ways: it eases out without
+/// overshooting, so the card never wobbles or cuts into the preset row.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Reveal {
     position: f64,
@@ -51,19 +51,14 @@ impl Reveal {
     }
     /// Advance by `dt` seconds; returns whether the card is still moving.
     pub fn step(&mut self, dt: f64) -> bool {
-        let (omega, zeta) = if self.open() { (17., 0.82) } else { (18., 1.) };
+        let omega = 18.;
         let mut left = dt.clamp(0., 0.1);
         while left > 0. {
             let h = left.min(1. / 240.);
-            let accel =
-                omega * omega * (self.target - self.position) - 2. * zeta * omega * self.velocity;
+            let accel = omega * omega * (self.target - self.position) - 2. * omega * self.velocity;
             self.velocity += accel * h;
             self.position += self.velocity * h;
             left -= h;
-        }
-        if !self.open() && self.position < 0. {
-            self.position = 0.;
-            self.velocity = 0.;
         }
         let active = (self.position - self.target).abs() > 0.001 || self.velocity.abs() > 0.01;
         if !active {
@@ -72,8 +67,7 @@ impl Reveal {
         }
         active
     }
-    /// Card height in logical pixels between `collapsed` and `expanded`;
-    /// briefly taller than `expanded` while the opening overshoots.
+    /// Card height in logical pixels between `collapsed` and `expanded`.
     pub fn height(self, collapsed: i32, expanded: i32) -> i32 {
         collapsed + (f64::from(expanded - collapsed) * self.position.max(0.)).round() as i32
     }

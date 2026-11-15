@@ -40,20 +40,24 @@ fn toggle_motion_does_not_depend_on_refresh_rate() {
 }
 
 #[test]
-fn settings_reveal_glides_open_with_minimal_give_and_closes_without_overshoot() {
+fn settings_reveal_eases_both_ways_without_moving_backwards() {
     use scrollpilot::control_motion::Reveal;
     let (shut, open) = (80, 320);
     let mut r = Reveal::default();
     r.target(true, true);
     let mut peak = 0;
     let mut frames = 0;
-    while r.step(1. / 60.) {
-        peak = peak.max(r.height(shut, open));
+    let mut last = shut;
+    while r.step(1. / 64.) {
+        let h = r.height(shut, open);
+        assert!(h >= last, "Opening must never step back: {last} -> {h}");
+        last = h;
+        peak = peak.max(h);
         frames += 1;
         assert!(frames < 60, "Reveal must settle within a second");
     }
     assert_eq!(r.height(shut, open), open);
-    assert!(peak <= open + 4, "Opening must not bounce visibly: {peak}");
+    assert!(peak <= open, "Opening must not overshoot: {peak}");
     r.target(false, true);
     let mut low = open;
     while r.step(1. / 60.) {
