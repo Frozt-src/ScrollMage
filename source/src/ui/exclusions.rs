@@ -55,17 +55,6 @@ impl Ui {
         self.exclusion_scroll = self
             .exclusion_scroll
             .clamp(0, (content - viewport.h).max(0));
-        let panel = self.handle(EXCLUSION_PANEL) as HWND;
-        let info = SCROLLINFO {
-            cbSize: size_of::<SCROLLINFO>() as u32,
-            fMask: SIF_RANGE | SIF_PAGE | SIF_POS,
-            nMin: 0,
-            nMax: content.max(1) - 1,
-            nPage: viewport.h.max(1) as u32,
-            nPos: self.exclusion_scroll,
-            ..zeroed()
-        };
-        SetScrollInfo(panel, SB_VERT, &info, 1);
         if self.excluded_apps.is_empty() {
             self.at(1116, Rect::new(0, 0, viewport.w - 18, 22));
         } else {
@@ -83,7 +72,7 @@ impl Ui {
                 Rect::new(row.x + row.w - 26, y + 2, 24, 22),
             );
         }
-        InvalidateRect(panel, null(), 0);
+        InvalidateRect(self.handle(EXCLUSION_PANEL) as HWND, null(), 0);
     }
 
     pub(super) unsafe fn reveal_exclusion(&mut self, index: usize) {
@@ -205,27 +194,6 @@ pub(super) unsafe extern "system" fn panel(h: HWND, msg: u32, w: usize, l: isize
                     ui.exclusion_generation as isize,
                 );
             }
-            0
-        }
-        WM_VSCROLL => {
-            let mut info = SCROLLINFO {
-                cbSize: size_of::<SCROLLINFO>() as u32,
-                fMask: SIF_TRACKPOS,
-                ..zeroed()
-            };
-            GetScrollInfo(h, SB_VERT, &mut info);
-            let old = ui.exclusion_scroll;
-            ui.exclusion_scroll = match (w & 0xffff) as i32 {
-                SB_LINEUP => old - 32,
-                SB_LINEDOWN => old + 32,
-                SB_PAGEUP => old - ui.shell().exclusion_viewport().h,
-                SB_PAGEDOWN => old + ui.shell().exclusion_viewport().h,
-                SB_TOP => 0,
-                SB_BOTTOM => i32::MAX,
-                SB_THUMBTRACK => info.nTrackPos,
-                _ => old,
-            };
-            ui.layout_exclusions();
             0
         }
         WM_MOUSEWHEEL => {

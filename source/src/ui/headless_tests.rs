@@ -69,6 +69,14 @@ fn hidden_native_settings_card_fits_collapsed_and_custom_at_supported_scales() {
                         cards[0].y + cards[0].h + 16,
                         "Options follow the card"
                     );
+                    for handle in ui.controls.iter().map(|c| c.1).chain([ui.body, ui.hwnd]) {
+                        let style = GetWindowLongW(handle as HWND, GWL_STYLE) as u32;
+                        assert_eq!(
+                            style & (WS_VSCROLL | WS_HSCROLL),
+                            0,
+                            "No native scroll bars"
+                        );
+                    }
                     for i in 0..6u16 {
                         assert_eq!(
                             IsWindowVisible(ui.inputs[i as usize] as HWND) != 0
@@ -342,7 +350,7 @@ unsafe fn hidden(scale: f64) -> Box<Ui> {
         WS_EX_CONTROLPARENT,
         wide("ScrollMage.HeadlessBody").as_ptr(),
         wide("Settings content").as_ptr(),
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
+        WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
         0,
         0,
         1,

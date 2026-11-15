@@ -34,8 +34,7 @@ use windows_sys::Win32::{
     UI::{
         Accessibility::*,
         Controls::{
-            SetScrollInfo, DRAWITEMSTRUCT, EM_SETLIMITTEXT, MEASUREITEMSTRUCT, ODS_SELECTED,
-            WM_MOUSELEAVE,
+            DRAWITEMSTRUCT, EM_SETLIMITTEXT, MEASUREITEMSTRUCT, ODS_SELECTED, WM_MOUSELEAVE,
         },
         HiDpi::*,
         Input::KeyboardAndMouse::*,
@@ -302,7 +301,6 @@ impl Ui {
             "COMBOBOX",
             "Scrolling preset",
             WS_TABSTOP
-                | WS_VSCROLL
                 | CBS_DROPDOWNLIST as u32
                 | CBS_OWNERDRAWFIXED as u32
                 | CBS_HASSTRINGS as u32,
@@ -411,7 +409,7 @@ impl Ui {
         let panel = self.create(
             "ScrollMage.Exclusions",
             "Excluded apps list",
-            WS_CLIPCHILDREN | WS_VSCROLL,
+            WS_CLIPCHILDREN,
             EXCLUSION_PANEL,
             true,
             self.fonts.small,
@@ -513,17 +511,8 @@ impl Ui {
         } else {
             shell.body.h
         };
+        // No native scroll bars: the wheel scrolls the page within this range.
         self.scroll = self.scroll.clamp(0, (content_h - shell.body.h).max(0));
-        let info = SCROLLINFO {
-            cbSize: size_of::<SCROLLINFO>() as u32,
-            fMask: SIF_RANGE | SIF_PAGE | SIF_POS,
-            nMin: 0,
-            nMax: content_h - 1,
-            nPage: shell.body.h.max(1) as u32,
-            nPos: self.scroll,
-            ..zeroed()
-        };
-        SetScrollInfo(self.body as HWND, SB_VERT, &info, 1);
         if self.view == NAV_SETTINGS {
             let cards = shell.cards().map(|mut c| {
                 c.y -= self.scroll;
@@ -1483,26 +1472,6 @@ unsafe extern "system" fn body(h: HWND, msg: u32, w: usize, l: isize) -> isize {
         }
         WM_ERASEBKGND => 1,
         WM_COMMAND | WM_DRAWITEM | WM_MEASUREITEM => SendMessageW(ui.hwnd as HWND, msg, w, l),
-        WM_VSCROLL => {
-            let shell = ui.shell();
-            let mut info = SCROLLINFO {
-                cbSize: size_of::<SCROLLINFO>() as u32,
-                fMask: SIF_TRACKPOS,
-                ..zeroed()
-            };
-            GetScrollInfo(h, SB_VERT, &mut info);
-            let old = ui.scroll;
-            ui.scroll = match (w & 0xffff) as i32 {
-                SB_LINEUP => old - 36,
-                SB_LINEDOWN => old + 36,
-                SB_PAGEUP => old - shell.body.h,
-                SB_PAGEDOWN => old + shell.body.h,
-                SB_THUMBTRACK => info.nTrackPos,
-                _ => old,
-            };
-            ui.layout();
-            0
-        }
         WM_MOUSEWHEEL => {
             let delta = ((w >> 16) as u16 as i16) as i32;
             // Multiply first: high-resolution wheels send deltas below one notch.
@@ -1937,7 +1906,7 @@ pub fn run(runtime: &Runtime, path: PathBuf, note: String, tray: bool) -> Result
             WS_EX_CONTROLPARENT,
             wide("ScrollPilot.Body").as_ptr(),
             wide("Settings content").as_ptr(),
-            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
+            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
             0,
             0,
             1,

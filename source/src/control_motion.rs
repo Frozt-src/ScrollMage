@@ -30,8 +30,8 @@ impl Toggle {
 }
 
 /// Height of the Scroll settings card: 0 shows only the preset row, 1 shows
-/// every tuning row. Opening overshoots and settles (an elastic slide down);
-/// closing is critically damped so it never cuts into the preset row.
+/// every tuning row. Opening glides in and settles with a barely visible
+/// give; closing is critically damped so it never cuts into the preset row.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Reveal {
     position: f64,
@@ -51,7 +51,7 @@ impl Reveal {
     }
     /// Advance by `dt` seconds; returns whether the card is still moving.
     pub fn step(&mut self, dt: f64) -> bool {
-        let (omega, zeta) = if self.open() { (14., 0.5) } else { (16., 1.) };
+        let (omega, zeta) = if self.open() { (17., 0.82) } else { (18., 1.) };
         let mut left = dt.clamp(0., 0.1);
         while left > 0. {
             let h = left.min(1. / 240.);
