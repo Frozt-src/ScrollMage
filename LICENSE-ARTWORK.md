@@ -5,7 +5,22 @@ Scroll Mage artwork is licensed under the
 (SPDX: `CC-BY-4.0`). The full legal text is at
 <https://creativecommons.org/licenses/by/4.0/legalcode>.
 
-Copyright (c) 2026 Frozt and Scroll Mage contributors.
+Copyright (c) 2026 Frozt and Scroll Mage contributors, to the extent the artwork
+is protected by copyright (see "Origin of the artwork" below).
+
+## Origin of the artwork
+
+Some source and reference images in this repository were generated with an AI
+image tool (ChatGPT) and carry content-credential (C2PA) metadata that says so:
+
+- `graphics/Stylized Black Mouse Silhouette Logo.png`
+- `graphics/WORKFLOW.png`
+- `assets/brand/mage-purple.png` and `source/assets/brand/mage-purple.png`
+
+The mouse emblem, icons and logo lockup were then drawn by hand as vector
+artwork based on those images. Copyright law in some countries may not protect
+purely AI-generated images. This license applies to whatever rights exist in the
+artwork, and no claim is made beyond that.
 
 ## What this covers
 

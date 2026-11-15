@@ -2,7 +2,7 @@
 
 Historical local review record, captured before publication. These source changes are included in 0.6.9; see the repository changelog for the published release.
 
-Verified October 18, 2026 (America/Los_Angeles). Local branch: `codex/profiles-and-scroll-diagnostics`, based on `6b16497278e19b3a19b75d3684cf2ef62607df06`. Source changes are uncommitted; no GitHub release was published.
+Verified October 18, 2026 (America/Los_Angeles). Local branch: `codex/profiles-and-scroll-diagnostics`, based on the `v0.6.7` tag. Source changes are uncommitted; no GitHub release was published.
 
 ## Implemented behavior
 

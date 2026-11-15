@@ -2,7 +2,7 @@
 
 Verified October 21, 2026. **Verdict: improved release candidate, not yet production-approved and not feature-equivalent to SmoothScroll.**
 
-Audited local `main` baseline `13700e7e24f62ca5de75582819ddd508c35eb4fc` (published 0.6.9), then made original fixes on `codex/production-readiness-audit` as 0.6.10 candidate. No published release or running app was replaced. No Scroll Mage process was found during the process-name check. The root executable, personal settings and published 0.6.9 ZIP retain their original hashes.
+Audited local `main` baseline the `v0.6.9` tag (published 0.6.9), then made original fixes on `codex/production-readiness-audit` as 0.6.10 candidate. No published release or running app was replaced. No Scroll Mage process was found during the process-name check. The root executable, personal settings and published 0.6.9 ZIP retain their original hashes.
 
 ## Method and reference boundary
 
@@ -108,7 +108,7 @@ GitHub Actions is enabled. The official Rust distribution endpoint returned HTTP
 
 The hosted packaged probe passed fresh startup/save in a Unicode path with spaces, preservation of corrupt bytes until an explicit recovery edit, blocked-save rollback and clean Quit. Its three-second paused idle sample recorded 0 ms added CPU and zero handle/GDI/USER deltas; this is a short sample, not a long-session performance claim. The local packaged executable has not been launched because the user's existing app is active; hosted results apply to the hosted-built executable, whose hash is recorded in its report.
 
-The first hosted run exposed Node 20 deprecation warnings for the old pinned actions. Official releases and action metadata were inspected; checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 and support the existing inputs. They remain pinned to full verified commit SHAs with read-only repository permission and disabled checkout credential persistence. [The final hosted run](https://github.com/Frozt-src/ScrollMage/actions/runs/39677503336) passed every step in 4m29s at `bda7d8cb193e01eb5cc6e8aaac2b694d201369b8`, including the updated actions and packaged acceptance document. Its three packaged scenarios passed; the short paused sample again recorded zero added CPU/handle/GDI/USER values. Downloaded final evidence is under ignored `source/target/hosted-readiness-final`. No main merge or release publication was performed; remote main remains `13700e7e24f62ca5de75582819ddd508c35eb4fc`. Branch protection is a separate repository policy decision.
+The first hosted run exposed Node 20 deprecation warnings for the old pinned actions. Official releases and action metadata were inspected; checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 and support the existing inputs. They remain pinned to full verified commit SHAs with read-only repository permission and disabled checkout credential persistence. [The final hosted run](https://github.com/Frozt-src/ScrollMage/actions/runs/39677503336) passed every step in 4m29s at `bda7d8cb193e01eb5cc6e8aaac2b694d201369b8`, including the updated actions and packaged acceptance document. Its three packaged scenarios passed; the short paused sample again recorded zero added CPU/handle/GDI/USER values. Downloaded final evidence is under ignored `source/target/hosted-readiness-final`. No main merge or release publication was performed; remote main remains the `v0.6.9` tag. Branch protection is a separate repository policy decision.
 
 ## Candidate and publication status
 

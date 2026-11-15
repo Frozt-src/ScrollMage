@@ -4,7 +4,7 @@ Rebuilt by hand in Adobe Illustrator 30.8.2 from the supplied mouse image. The c
 
 ## Files
 
-- `Mouse-Emblem.ai`: editable Illustrator master, saved with PDF compatibility.
+- `Mouse-Emblem.ai`: editable Illustrator master. It is not included in this repository; the SVG files are the editable sources here.
 - `Mouse-Emblem-Light.svg` and `.png`: light artwork with a subtle shade difference on the far ear and feet. Transparent background. PNG is 2560 x 2560.
 - `Mouse-Emblem-Ink.svg` and `.png`: single-color dark artwork. Transparent background. PNG is 2560 x 2560.
 - `Mouse-Emblem-Preview.png`: charcoal presentation preview.

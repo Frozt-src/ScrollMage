@@ -1,6 +1,6 @@
 name: Windows quality
 
-# Manual only: Windows runners on a private repository use paid Actions minutes.
+# Manual only, to keep Windows runner usage deliberate.
 # Run locally with ./tools/Validate.ps1, or start this from the Actions tab.
 on:
   workflow_dispatch:
