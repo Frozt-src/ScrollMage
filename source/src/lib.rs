@@ -12,5 +12,4 @@ pub mod frost;
 pub mod layout;
 pub mod logo_motion;
 pub mod motion;
-pub mod policy;
 pub mod settings;

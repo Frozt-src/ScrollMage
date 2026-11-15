@@ -1,4 +1,4 @@
-use scrollpilot::{engine::Engine, policy::intercept, settings::Settings};
+use scrollpilot::{engine::Engine, settings::Settings};
 fn unaccelerated() -> Settings {
     Settings {
         acceleration_max: 1.,
@@ -64,20 +64,6 @@ fn fractional_outputs_accumulate_across_frames() {
     e.push(0., 120, false, 1, &s);
     let sum: i32 = (0..=1000).map(|i| e.tick(i as f64, 1)[0]).sum();
     assert_eq!(sum, 121);
-}
-#[test]
-fn injected_modified_precise_or_ineligible_input_passes_through() {
-    for args in [
-        (120, true, false, true, true),
-        (120, false, true, true, true),
-        (15, false, false, true, true),
-        (120, false, false, false, true),
-        (120, false, false, true, false),
-        (0, false, false, true, true),
-    ] {
-        assert!(!intercept(args.0, args.1, args.2, args.3, args.4));
-    }
-    assert!(intercept(-120, false, false, true, true));
 }
 #[test]
 fn invalid_settings_are_rejected() {

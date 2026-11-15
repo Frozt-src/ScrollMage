@@ -296,7 +296,6 @@ unsafe fn shared() -> Arc<Shared> {
         watch_cursor: AtomicU64::new(0),
         watch_seen: AtomicU64::new(0),
         fault: Mutex::new(String::new()),
-        diagnostics: scrollpilot::diagnostics::Diagnostics::default(),
     })
 }
 
@@ -817,9 +816,9 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
                 ui.px(104),
                 SWP_NOACTIVATE | SWP_NOZORDER,
             );
-            ui.prepare_profile_backdrop(list);
+            ui.prepare_preset_menu_backdrop(list);
             let original = ui
-                .profile_backdrop
+                .preset_menu_backdrop
                 .borrow()
                 .as_ref()
                 .unwrap()
@@ -832,16 +831,16 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
                 "Frost must contain the app's rendered content"
             );
             let cached = ui
-                .profile_backdrop
+                .preset_menu_backdrop
                 .borrow()
                 .as_ref()
                 .unwrap()
                 .pixels
                 .as_ptr();
-            ui.prepare_profile_backdrop(list);
+            ui.prepare_preset_menu_backdrop(list);
             assert_eq!(
                 cached,
-                ui.profile_backdrop
+                ui.preset_menu_backdrop
                     .borrow()
                     .as_ref()
                     .unwrap()
@@ -849,22 +848,22 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
                     .as_ptr()
             );
             set(ui.inputs[0], "300");
-            ui.profile_backdrop.borrow_mut().take();
-            ui.prepare_profile_backdrop(list);
+            ui.preset_menu_backdrop.borrow_mut().take();
+            ui.prepare_preset_menu_backdrop(list);
             assert_ne!(
                 original,
-                ui.profile_backdrop.borrow().as_ref().unwrap().pixels,
+                ui.preset_menu_backdrop.borrow().as_ref().unwrap().pixels,
                 "The blur must follow the owned controls behind the popup"
             );
             set(ui.inputs[0], "120");
-            ui.profile_backdrop.borrow_mut().take();
+            ui.preset_menu_backdrop.borrow_mut().take();
             let region = CreateRectRgn(0, 0, 0, 0);
             assert_ne!(GetWindowRgn(list, region), 0);
             assert_eq!(PtInRegion(region, 0, 0), 0);
             assert_ne!(PtInRegion(region, ui.px(70), ui.px(20)), 0);
             DeleteObject(region);
             assert_eq!(IsWindowVisible(list), 0);
-            let reverse = ui.handle(213) as HWND;
+            let reverse = ui.handle(REVERSE_OPTION) as HWND;
             assert!(!checked(reverse as usize));
             SendMessageW(reverse, BM_CLICK, 0, 0);
             assert!(checked(reverse as usize));
@@ -930,13 +929,14 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
 
             // Keyboard stepping must reach the same field as the paired buttons.
             for (i, default) in [120., 30., 70., 1., 4., 22.].into_iter().enumerate() {
-                SendMessageW(hwnd, WM_COMMAND, 400 + i * 2, 0);
+                SendMessageW(hwnd, WM_COMMAND, usize::from(STEPPER) + i * 2, 0);
                 assert_eq!(text(ui.inputs[i]).parse::<f64>().unwrap(), default + 1.);
                 SendMessageW(ui.inputs[i] as HWND, WM_KEYDOWN, VK_DOWN as usize, 0);
                 assert_eq!(text(ui.inputs[i]).parse::<f64>().unwrap(), default);
             }
             set(ui.inputs[3], "1");
-            SendMessageW(hwnd, WM_COMMAND, 407, 0);
+            // Decrease maximum acceleration (row 3) at its lower bound.
+            SendMessageW(hwnd, WM_COMMAND, usize::from(STEPPER + 3 * 2 + 1), 0);
             assert_eq!(text(ui.inputs[3]), "1");
             let combo = ui.handle(PRESET) as HWND;
             if scale == 1.25 {
@@ -1127,7 +1127,7 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
             std::fs::create_dir_all(&output).unwrap();
             surface.save(&output.join(format!("settings-{}.bmp", (scale * 100.) as i32)));
             if scale == 1. {
-                let stepper = ui.handle(400) as HWND;
+                let stepper = ui.handle(STEPPER) as HWND;
                 let normal = Surface::new(25, 17);
                 ui.paint_button(stepper, normal.dc);
                 normal.save(&output.join("stepper-raised.bmp"));
@@ -1161,7 +1161,7 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
                 ui.toggle_motion[1].target(true, true);
                 ui.toggle_motion[1].step(0.06);
                 let midway = Surface::new(370, 44);
-                ui.paint_button(ui.handle(213) as HWND, midway.dc);
+                ui.paint_button(ui.handle(REVERSE_OPTION) as HWND, midway.dc);
                 midway.save(&output.join("toggle-midway.bmp"));
                 ui.snap_toggles();
             }

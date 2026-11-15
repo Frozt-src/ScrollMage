@@ -9,7 +9,7 @@ pub(super) struct Frost {
 
 impl Ui {
     /// Render only this app's surfaces into memory. Never sample the desktop.
-    pub(super) unsafe fn prepare_profile_backdrop(&self, list: HWND) {
+    pub(super) unsafe fn prepare_preset_menu_backdrop(&self, list: HWND) {
         let mut rect: RECT = zeroed();
         GetClientRect(list, &mut rect);
         let mut origin = POINT { x: 0, y: 0 };
@@ -18,12 +18,17 @@ impl Ui {
         if width <= 0 || height <= 0 || width > 4096 || height > 2048 {
             return;
         }
-        if self.profile_backdrop.borrow().as_ref().is_some_and(|f| {
-            f.origin.x == origin.x
-                && f.origin.y == origin.y
-                && f.width == width
-                && f.height == height
-        }) {
+        if self
+            .preset_menu_backdrop
+            .borrow()
+            .as_ref()
+            .is_some_and(|f| {
+                f.origin.x == origin.x
+                    && f.origin.y == origin.y
+                    && f.width == width
+                    && f.height == height
+            })
+        {
             return;
         }
         let radius = self.px(6).max(1);
@@ -135,7 +140,7 @@ impl Ui {
             let start = (y * w + pad) as usize;
             cropped.extend_from_slice(&pixels[start..start + width as usize]);
         }
-        *self.profile_backdrop.borrow_mut() = Some(Frost {
+        *self.preset_menu_backdrop.borrow_mut() = Some(Frost {
             origin,
             width,
             height,
@@ -143,9 +148,9 @@ impl Ui {
         });
     }
 
-    pub(super) unsafe fn paint_profile_backdrop(&self, list: HWND, dc: HDC, clip: RECT) {
-        self.prepare_profile_backdrop(list);
-        let backdrop = self.profile_backdrop.borrow();
+    pub(super) unsafe fn paint_preset_menu_backdrop(&self, list: HWND, dc: HDC, clip: RECT) {
+        self.prepare_preset_menu_backdrop(list);
+        let backdrop = self.preset_menu_backdrop.borrow();
         if let Some(frost) = backdrop.as_ref() {
             let saved = SaveDC(dc);
             IntersectClipRect(dc, clip.left, clip.top, clip.right, clip.bottom);

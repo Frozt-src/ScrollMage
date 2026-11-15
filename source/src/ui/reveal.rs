@@ -9,22 +9,14 @@ impl Ui {
         if open == self.reveal.open() && animate {
             return;
         }
-        let mut animation: i32 = 0;
-        let allowed = SystemParametersInfoW(
-            SPI_GETCLIENTAREAANIMATION,
-            0,
-            (&mut animation as *mut i32).cast(),
-            0,
-        ) != 0
-            && animation != 0;
         let animate = animate
-            && allowed
+            && animations_allowed()
             && IsWindowVisible(self.hwnd as HWND) != 0
             && IsIconic(self.hwnd as HWND) == 0;
         if !open {
             // Hidden rows cannot keep focus; hand it to the preset picker.
             let focus = GetFocus() as usize;
-            if self.inputs.contains(&focus) || (400..412).any(|id| self.handle(id) == focus) {
+            if self.inputs.contains(&focus) || STEPPERS.clone().any(|id| self.handle(id) == focus) {
                 SetFocus(self.handle(PRESET) as HWND);
             }
         }

@@ -29,8 +29,14 @@ impl Ui {
         let editable = !self.preset.fixed();
         for (i, input) in self.inputs.iter().enumerate() {
             EnableWindow(*input as HWND, i32::from(editable));
-            EnableWindow(self.handle(400 + i as u16 * 2) as HWND, i32::from(editable));
-            EnableWindow(self.handle(401 + i as u16 * 2) as HWND, i32::from(editable));
+            EnableWindow(
+                self.handle(STEPPER + i as u16 * 2) as HWND,
+                i32::from(editable),
+            );
+            EnableWindow(
+                self.handle(STEPPER + 1 + i as u16 * 2) as HWND,
+                i32::from(editable),
+            );
         }
         self.update_tuning_hint();
     }

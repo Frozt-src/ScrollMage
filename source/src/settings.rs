@@ -44,6 +44,8 @@ impl Preset {
         self != Self::Custom
     }
     /// Canonical values for this preset; Custom starts from Default's values.
+    /// These are our Windows wheel tuning, not Apple's private scrolling
+    /// constants. Friction and elastic response affect the owned test surface only.
     pub fn tuning(self) -> Tuning {
         let [distance, omega, acceleration_ms, acceleration_max, friction, elastic_omega] =
             match self {
@@ -188,8 +190,7 @@ impl Settings {
             self.custom_tuning.unwrap_or(current)
         });
     }
-    /// Our Windows wheel tuning, not Apple's private scrolling constants.
-    /// Friction and elastic response affect the owned test surface only.
+    /// Apply `preset` before saving; the same as `select_preset`.
     pub fn apply_preset(&mut self, preset: Preset) {
         self.select_preset(preset);
     }

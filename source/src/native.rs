@@ -1,5 +1,5 @@
 use scrollpilot::{
-    diagnostics::{Diagnostics, InputReason, Routing, TargetReason},
+    diagnostics::{InputReason, Routing, TargetReason},
     engine::Engine,
     settings::Settings,
 };
@@ -114,7 +114,6 @@ pub struct Shared {
     pub ticks: AtomicU64,
     pub hook_max_us: AtomicU64,
     pub fault: Mutex<String>,
-    pub diagnostics: Diagnostics,
 }
 static SHARED: OnceLock<Arc<Shared>> = OnceLock::new();
 impl Shared {
@@ -130,7 +129,6 @@ impl Shared {
         self.enabled.store(false, Ordering::Release);
         if let Ok(mut e) = self.engine.lock() {
             e.clear();
-            self.diagnostics.invalidate();
         }
         self.notify();
         self.update_ui();
@@ -141,11 +139,6 @@ impl Shared {
             if w != 0 {
                 PostMessageW(w as HWND, UPDATE, 0, 0);
             }
-        }
-    }
-    fn update_input_ui(&self) {
-        if self.diagnostics.should_post_ui(self.now() as u64) {
-            self.update_ui();
         }
     }
     /// Windows can drop a low-level hook without telling its owner. If the
@@ -203,7 +196,6 @@ impl Shared {
             let own = pid == GetCurrentProcessId();
             let opts = self.settings.read().ok();
             let mut tuning = opts.as_ref().map(|s| s.wheel()).unwrap_or_default();
-            let mut app = String::new();
             let mut reason = if routing == Routing::Unknown {
                 TargetReason::RoutingUnavailable
             } else if !cursor_ok
@@ -215,9 +207,7 @@ impl Shared {
             } else {
                 TargetReason::Ready
             };
-            if own {
-                app = "Scroll Test".into();
-            } else if reason == TargetReason::Ready {
+            if !own && reason == TargetReason::Ready {
                 let p = Handle(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) as usize);
                 if p.0 == 0 {
                     reason = TargetReason::UnknownProcess;
@@ -229,7 +219,6 @@ impl Shared {
                     } else {
                         let path = String::from_utf16_lossy(&name[..len as usize]);
                         let base = path.rsplit('\\').next().unwrap_or("");
-                        app = base.into();
                         if let Some(s) = opts.as_ref() {
                             tuning = s.for_app(base);
                             if s.excluded(base) {
@@ -264,11 +253,9 @@ impl Shared {
                             q.store(0, Ordering::Release);
                         }
                         self.latch.store(0, Ordering::Release);
-                        self.diagnostics.invalidate();
                         *target = next;
                         self.notify();
                     }
-                    self.diagnostics.set_target(app, reason);
                 }
             }
         }
@@ -372,7 +359,7 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
     if let Some(s) = SHARED.get() {
         let began = Instant::now();
         let m = &*(data as *const MSLLHOOKSTRUCT);
-        // Emissions pass exactly once and are not external bypass observations.
+        // Our own emissions pass through exactly once.
         if m.dwExtraInfo == TAG {
             return CallNextHookEx(std::ptr::null_mut(), code, msg, data);
         }
@@ -450,7 +437,6 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
                 }
             }
         }
-        s.diagnostics.record_input(reason, s.now() as u64);
         if reason == InputReason::TargetChanged {
             // The pointer is over a window the last poll has not seen yet.
             // Look it up now so only this notch passes through unsmoothed.
@@ -459,7 +445,6 @@ unsafe extern "system" fn mouse_hook(code: i32, msg: usize, data: isize) -> isiz
                 PostMessageW(ui as HWND, REFRESH, 0, 0);
             }
         }
-        s.update_input_ui();
         if !accepted {
             // Fine/OS-generated input, modifiers and bypasses interrupt our existing tail.
             if let Ok(mut engine) = s.engine.try_lock() {
@@ -579,8 +564,6 @@ fn worker(s: Arc<Shared>, ready: std::sync::mpsc::Sender<Result<(), String>>) {
                                 break;
                             }
                             s.sent.fetch_add(1, Ordering::Relaxed);
-                            s.diagnostics.record_output(s.now() as u64);
-                            s.update_input_ui();
                         }
                     }
                 }
@@ -637,7 +620,6 @@ impl Runtime {
                 } else {
                     String::new()
                 }),
-                diagnostics: Diagnostics::default(),
             });
             SHARED
                 .set(s.clone())

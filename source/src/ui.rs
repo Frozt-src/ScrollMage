@@ -61,6 +61,15 @@ const WINDOW_MAXIMIZE: u16 = 151;
 const WINDOW_CLOSE: u16 = 152;
 const EXCLUSION_ROW: u16 = 2000;
 const RESET_PREVIEW: u16 = 134;
+const HORIZONTAL_OPTION: u16 = 212;
+const REVERSE_OPTION: u16 = 213;
+const STARTUP_OPTION: u16 = 214;
+/// The Options card's switches, in display order.
+const OPTION_TOGGLES: [u16; 3] = [HORIZONTAL_OPTION, REVERSE_OPTION, STARTUP_OPTION];
+/// Tuning row `i` has an increase stepper `STEPPER + 2i` and a decrease
+/// stepper `STEPPER + 2i + 1`.
+const STEPPER: u16 = 400;
+const STEPPERS: std::ops::Range<u16> = STEPPER..STEPPER + 12;
 
 struct Ui {
     brand: scrollpilot::brand_lockup::Lockup,
@@ -77,7 +86,7 @@ struct Ui {
     exclusion_scroll: i32,
     exclusion_generation: usize,
     preset: Preset,
-    profile_backdrop: std::cell::RefCell<Option<backdrop::Frost>>,
+    preset_menu_backdrop: std::cell::RefCell<Option<backdrop::Frost>>,
     reverse: usize,
     horizontal: usize,
     exclusion_input: usize,
@@ -126,6 +135,17 @@ unsafe fn check(hwnd: usize, b: bool) {
     SendMessageW(hwnd as HWND, BM_SETCHECK, usize::from(b), 0);
     InvalidateRect(hwnd as HWND, null(), 0);
 }
+/// Windows' "Show animations" setting. A failed read counts as off.
+unsafe fn animations_allowed() -> bool {
+    let mut enabled: i32 = 0;
+    SystemParametersInfoW(
+        SPI_GETCLIENTAREAANIMATION,
+        0,
+        (&mut enabled as *mut i32).cast(),
+        0,
+    ) != 0
+        && enabled != 0
+}
 unsafe fn state(hwnd: HWND) -> *mut Ui {
     GetWindowLongPtrW(GetAncestor(hwnd, GA_ROOT), GWLP_USERDATA) as *mut Ui
 }
@@ -153,7 +173,7 @@ impl Ui {
             exclusion_scroll: 0,
             exclusion_generation: 0,
             preset: Preset::Default,
-            profile_backdrop: Default::default(),
+            preset_menu_backdrop: Default::default(),
             reverse: 0,
             horizontal: 0,
             exclusion_input: 0,
@@ -347,34 +367,34 @@ impl Ui {
             );
             self.button(
                 &format!("Increase {}", labels[i].to_lowercase()),
-                400 + i as u16 * 2,
+                STEPPER + i as u16 * 2,
                 true,
                 false,
             );
             self.button(
                 &format!("Decrease {}", labels[i].to_lowercase()),
-                401 + i as u16 * 2,
+                STEPPER + 1 + i as u16 * 2,
                 true,
                 false,
             );
         }
         self.horizontal = self.button(
             "Horizontal scrolling\nUse Shift + wheel to move sideways.",
-            212,
+            HORIZONTAL_OPTION,
             true,
             true,
         );
         check(self.horizontal, opts.horizontal);
         self.reverse = self.button(
             "Reverse direction\nInvert the scrolling direction.",
-            213,
+            REVERSE_OPTION,
             true,
             true,
         );
         check(self.reverse, opts.reverse);
         self.startup = self.button(
             "Start at sign in\nOpen Scroll Mage when you sign in.",
-            214,
+            STARTUP_OPTION,
             true,
             true,
         );
@@ -535,14 +555,20 @@ impl Ui {
                     Rect::new(c.x + 20, y + if i == 3 { 0 } else { 6 }, c.w - 154, 24),
                 );
                 self.at(201 + i as u16, Rect::new(input_x + 10, y + 8, 60, 22));
-                self.at(400 + i as u16 * 2, Rect::new(input_x + 77, y + 1, 25, 17));
-                self.at(401 + i as u16 * 2, Rect::new(input_x + 77, y + 18, 25, 17));
+                self.at(
+                    STEPPER + i as u16 * 2,
+                    Rect::new(input_x + 77, y + 1, 25, 17),
+                );
+                self.at(
+                    STEPPER + 1 + i as u16 * 2,
+                    Rect::new(input_x + 77, y + 18, 25, 17),
+                );
                 if i == 3 {
                     self.at(1013, Rect::new(c.x + 20, y + 22, c.w - 154, 16));
                 }
             }
             let c = cards[1];
-            for (i, id) in [212, 213, 214].into_iter().enumerate() {
+            for (i, id) in OPTION_TOGGLES.into_iter().enumerate() {
                 self.at(
                     id,
                     Rect::new(c.x + 20, c.y + 48 + i as i32 * 44, c.w - 40, 44),
@@ -616,7 +642,7 @@ impl Ui {
         if self.preset.fixed() {
             return;
         }
-        let index = ((id - 400) / 2) as usize;
+        let index = ((id - STEPPER) / 2) as usize;
         let (min, max) = [
             (1., 960.),
             (10., 80.),
@@ -626,7 +652,7 @@ impl Ui {
             (10., 50.),
         ][index];
         if let Ok(value) = text(self.inputs[index]).parse::<f64>() {
-            let increment = if (id - 400).is_multiple_of(2) {
+            let increment = if (id - STEPPER).is_multiple_of(2) {
                 1.
             } else {
                 -1.
@@ -647,17 +673,10 @@ impl Ui {
         if !visible || IsIconic(self.hwnd as HWND) != 0 {
             self.snap_toggles();
         }
-        let mut enabled: i32 = 0;
-        let read = SystemParametersInfoW(
-            SPI_GETCLIENTAREAANIMATION,
-            0,
-            (&mut enabled as *mut i32).cast(),
-            0,
-        ) != 0;
         self.logo_animated = scrollpilot::branding::should_animate(
             visible,
             IsIconic(self.hwnd as HWND) != 0,
-            !read || enabled == 0,
+            !animations_allowed(),
         );
         if self.logo_animated {
             SetTimer(self.hwnd as HWND, 5, 25, None);
@@ -926,7 +945,7 @@ impl Ui {
         } else {
             text(h as usize)
         };
-        let is_toggle = [212, 213, 214].contains(&id);
+        let is_toggle = OPTION_TOGGLES.contains(&id);
         if [WINDOW_MINIMIZE, WINDOW_MAXIMIZE, WINDOW_CLOSE].contains(&id) {
             self.paint_caption_button(h, dc, id, w, height, pressed);
         } else if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) && id % 2 == 1 {
@@ -944,7 +963,7 @@ impl Ui {
             line(dc, x + 4, y - 4, x - 4, y + 4, self.scale, MUTED, 1);
         } else if is_toggle {
             let on = checked(h as usize);
-            let index = [212, 213, 214].iter().position(|&v| v == id).unwrap();
+            let index = OPTION_TOGGLES.iter().position(|&v| v == id).unwrap();
             let motion = self.toggle_motion[index];
             let progress = if self.toggle_initialized {
                 motion.position()
@@ -1040,7 +1059,7 @@ impl Ui {
                 &caption,
                 DT_SINGLELINE | DT_VCENTER,
             );
-        } else if (400..412).contains(&id) {
+        } else if STEPPERS.contains(&id) {
             let enabled = IsWindowEnabled(h) != 0;
             let pressed = pressed && enabled;
             if enabled {
@@ -1062,7 +1081,7 @@ impl Ui {
                 );
             }
             let glyph = if enabled { MUTED } else { DISABLED };
-            let up = (id - 400).is_multiple_of(2);
+            let up = (id - STEPPER).is_multiple_of(2);
             let center = w / 2;
             let top = height / 2 + if pressed { 2 } else { 0 };
             line(
@@ -1126,9 +1145,7 @@ impl Ui {
                 DT_SINGLELINE | DT_VCENTER | DT_CENTER,
             );
         }
-        if focused
-            && !(400..412).contains(&id)
-            && !(EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id)
+        if focused && !STEPPERS.contains(&id) && !(EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id)
         {
             outline(
                 dc,
@@ -1191,11 +1208,7 @@ unsafe extern "system" fn static_label(
             return;
         }
 
-        let muted = id == 901
-            || id == 903
-            || id == 904
-            || (1010..1016).contains(&id)
-            || (1110..1116).contains(&id);
+        let muted = id == 904 || (1010..1016).contains(&id) || (1110..1116).contains(&id);
         let rect = Rect::new(
             0,
             0,
@@ -1259,7 +1272,7 @@ unsafe extern "system" fn edit(h: HWND, msg: u32, w: usize, l: isize, _: usize, 
         return 0;
     }
     if msg == WM_KEYDOWN && (201..207).contains(&id) && (w as u16 == VK_UP || w as u16 == VK_DOWN) {
-        let command = 400 + (id - 201) * 2 + u16::from(w as u16 == VK_DOWN);
+        let command = STEPPER + (id - 201) * 2 + u16::from(w as u16 == VK_DOWN);
         SendMessageW(GetAncestor(h, GA_ROOT), WM_COMMAND, command as usize, 0);
         return 0;
     }
@@ -1328,7 +1341,7 @@ unsafe extern "system" fn button(
     if IsWindow(h) == 0 {
         return result;
     }
-    if msg == BM_SETCHECK && [212, 213, 214].contains(&(GetDlgCtrlID(h) as u16)) {
+    if msg == BM_SETCHECK && OPTION_TOGGLES.contains(&(GetDlgCtrlID(h) as u16)) {
         PostMessageW(GetAncestor(h, GA_ROOT), CONTROL_MOTION, 0, 0);
     }
     if matches!(
@@ -1379,12 +1392,7 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
         SetTextColor(
             w as HDC,
             color(
-                if id == 901
-                    || id == 903
-                    || id == 904
-                    || (1010..1016).contains(&id)
-                    || (1110..1116).contains(&id)
-                {
+                if id == 904 || (1010..1016).contains(&id) || (1110..1116).contains(&id) {
                     MUTED
                 } else {
                     INK
@@ -1571,20 +1579,18 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                     .map_or(ui.fonts.body, |(_, new)| *new);
                 SendMessageW(control as HWND, WM_SETFONT, font, 1);
             }
-            for (id, row_height) in [(PRESET, 32), (3003, 28)] {
-                SendMessageW(
-                    ui.handle(id) as HWND,
-                    CB_SETITEMHEIGHT,
-                    0,
-                    ui.px(row_height) as isize,
-                );
-                SendMessageW(
-                    ui.handle(id) as HWND,
-                    CB_SETITEMHEIGHT,
-                    usize::MAX,
-                    ui.px(28) as isize,
-                );
-            }
+            SendMessageW(
+                ui.handle(PRESET) as HWND,
+                CB_SETITEMHEIGHT,
+                0,
+                ui.px(32) as isize,
+            );
+            SendMessageW(
+                ui.handle(PRESET) as HWND,
+                CB_SETITEMHEIGHT,
+                usize::MAX,
+                ui.px(28) as isize,
+            );
             drop(old_fonts);
             let r = &*(l as *const RECT);
             SetWindowPos(
@@ -1633,7 +1639,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                 return 0;
             }
             match id {
-                212..=214 => {
+                HORIZONTAL_OPTION | REVERSE_OPTION | STARTUP_OPTION => {
                     ui.note.clear();
                     ui.sync_toggles();
                     ui.update_pending();
@@ -1682,7 +1688,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                 WINDOW_CLOSE => {
                     PostMessageW(h, WM_CLOSE, 0, 0);
                 }
-                400..=411 => ui.step((w & 0xffff) as u16),
+                id if STEPPERS.contains(&id) => ui.step(id),
                 RESET_PREVIEW => {
                     ui.preview = [
                         scrollpilot::motion::GestureAxis::new(0., 500., ui.preview[0].viewport),

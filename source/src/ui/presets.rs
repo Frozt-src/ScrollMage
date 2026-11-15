@@ -95,7 +95,7 @@ impl Ui {
         let mut info: windows_sys::Win32::UI::Controls::COMBOBOXINFO = zeroed();
         info.cbSize = size_of::<windows_sys::Win32::UI::Controls::COMBOBOXINFO>() as u32;
         windows_sys::Win32::UI::Controls::GetComboBoxInfo(self.handle(PRESET) as HWND, &mut info);
-        self.paint_profile_backdrop(info.hwndList, item.hDC, rect);
+        self.paint_preset_menu_backdrop(info.hwndList, item.hDC, rect);
         let row = Rect::new(
             (f64::from(rect.left) / self.scale).round() as i32 + 4,
             (f64::from(rect.top) / self.scale).round() as i32 + 2,
@@ -162,7 +162,7 @@ pub(super) unsafe fn style_popup(combo: HWND, scale: f64) {
     SetWindowLongPtrW(list, GWL_EXSTYLE, ex as isize);
     let ui = state(combo);
     if !ui.is_null() {
-        (*ui).profile_backdrop.borrow_mut().take();
+        (*ui).preset_menu_backdrop.borrow_mut().take();
     }
     SetWindowSubclass(list, Some(popup), 7, ui as usize);
     SetWindowPos(
@@ -203,7 +203,7 @@ unsafe extern "system" fn popup(
     if msg == WM_ERASEBKGND && !ptr.is_null() {
         let mut rect = zeroed();
         GetClientRect(h, &mut rect);
-        (*ptr).paint_profile_backdrop(h, w as HDC, rect);
+        (*ptr).paint_preset_menu_backdrop(h, w as HDC, rect);
         return 1;
     }
     let result = DefSubclassProc(h, msg, w, l);
@@ -211,11 +211,11 @@ unsafe extern "system" fn popup(
         round_popup(h, (*ptr).scale);
     }
     if msg == WM_WINDOWPOSCHANGED && !ptr.is_null() && IsWindowVisible(h) != 0 {
-        (*ptr).prepare_profile_backdrop(h);
+        (*ptr).prepare_preset_menu_backdrop(h);
         InvalidateRect(h, null(), 0);
     }
     if msg == WM_SHOWWINDOW && w == 0 && !ptr.is_null() {
-        (*ptr).profile_backdrop.borrow_mut().take();
+        (*ptr).preset_menu_backdrop.borrow_mut().take();
     }
     if msg == WM_NCDESTROY {
         RemoveWindowSubclass(h, Some(popup), 7);
