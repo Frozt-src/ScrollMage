@@ -2,6 +2,7 @@ use scrollpilot::{engine::Engine, policy::intercept, settings::Settings};
 fn unaccelerated() -> Settings {
     Settings {
         acceleration_max: 1.,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     }
 }
@@ -83,6 +84,7 @@ fn invalid_settings_are_rejected() {
     for duration in [f64::NAN, 0., 1e9] {
         assert!(Settings {
             omega: duration,
+            preset: scrollpilot::settings::Preset::Custom,
             ..Settings::default()
         }
         .validate()
@@ -90,6 +92,7 @@ fn invalid_settings_are_rejected() {
     }
     assert!(Settings {
         distance: -1.,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     }
     .validate()

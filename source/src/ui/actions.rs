@@ -45,7 +45,7 @@ impl Ui {
         }
         let mut opts = Settings {
             preset: self.preset,
-            default_tuning: self.shared.settings.read().unwrap().default_tuning,
+            custom_tuning: self.shared.settings.read().unwrap().custom_tuning,
             distance: values[0],
             omega: values[1],
             acceleration_ms: values[2],
@@ -66,7 +66,7 @@ impl Ui {
         if self.preset.fixed() {
             opts.apply_preset(self.preset);
         } else {
-            opts.default_tuning = Some(opts.tuning());
+            opts.custom_tuning = Some(opts.tuning());
         }
         if let Err(e) = settings::save(&self.path, &opts) {
             self.note = e;

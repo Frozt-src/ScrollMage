@@ -23,12 +23,10 @@ Scroll Mage is for desktop mice and does not support touchpads. Precision touchp
 ## Get it running
 
 1. Open **Scroll Mage** from the desktop shortcut or run `ScrollMage.exe`.
-2. Choose **Default** for editable tuning, **macOS style** for a softer accelerated response, or **Super smooth** for fast free-spin-style coasting. Selecting a preset saves and activates it immediately.
-3. Default allows numeric adjustments; click **Apply changes** to save those edits. Modified values show **Custom Default tuning**. The other two presets keep their fixed values locked. Switching back to Default restores its saved tuning.
+2. Choose **Default** for crisp, precise scrolling, **macOS style** for a softer accelerated response, or **Super smooth** for fast free-spin-style coasting. Selecting a preset saves and activates it immediately.
+3. Choose **Custom** to tune it yourself: the Scroll settings card opens to show every value. Click **Apply changes** to save your edits. Custom remembers its values when you switch to another preset and back.
 4. Try the result in **Scroll Test**, then in the apps you use.
 5. If an app feels better with its own scrolling, add it to **Excluded apps**.
-
-Use **App profiles** to give an EXE its own custom distance/response or fixed preset, or let it pass through. Save applies that app profile immediately; Remove returns it to global settings unless it is excluded. **Activity** explains input bypass reasons and shows accepted/output/bypass counts. A ready/enabled state alone does not mean input has been transformed.
 
 For exclusions, enter something like `game.exe` or paste the full EXE path, then click **Add** or press **Enter**. Adding or removing an exclusion saves it immediately. Other tuning changes and the sign-in option use **Apply settings**.
 

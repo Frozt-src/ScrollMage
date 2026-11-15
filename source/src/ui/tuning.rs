@@ -22,6 +22,7 @@ impl Ui {
         );
         self.loading_controls = false;
         self.sync_preset_controls();
+        self.sync_reveal(true);
     }
 
     pub(super) unsafe fn sync_preset_controls(&self) {
@@ -35,26 +36,13 @@ impl Ui {
     }
 
     unsafe fn update_tuning_hint(&self) {
-        let original = Preset::Default.tuning();
-        let custom = self
-            .inputs
-            .iter()
-            .zip([
-                original.distance,
-                original.omega,
-                original.acceleration_ms,
-                original.acceleration_max,
-                original.friction,
-                original.elastic_omega,
-            ])
-            .any(|(input, value)| text(*input).trim().parse::<f64>() != Ok(value));
         set(
             self.handle(1110),
             match self.preset {
-                Preset::SuperSmooth => "Softest glide. Flick to coast.",
+                Preset::Default => "Crisp and precise.",
                 Preset::MacosStyle => "Soft glide, faster as you spin.",
-                Preset::Default if custom => "Custom Default tuning.",
-                Preset::Default => "Crisp and precise. Editable.",
+                Preset::SuperSmooth => "Softest glide. Flick to coast.",
+                Preset::Custom => "Your own tuning. Apply to save.",
             },
         );
     }

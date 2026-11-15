@@ -1,5 +1,4 @@
 mod actions;
-mod activity;
 mod app_icons;
 mod backdrop;
 mod control_motion;
@@ -7,14 +6,17 @@ mod exclusions;
 mod frame;
 mod presets;
 mod preview;
-mod profiles;
+mod reveal;
 mod startup;
 mod theme;
 mod tuning;
 use crate::native::{wide, Handle, Runtime, Shared, REFRESH, UPDATE};
 use presets::preset_combo;
 use scrollpilot::{
-    layout::{Rect, Shell, DEFAULT_HEIGHT, DEFAULT_WIDTH, FORM_ROW_GAP, FORM_ROW_START},
+    layout::{
+        form_row_visible, form_row_y, Rect, Shell, DEFAULT_HEIGHT, DEFAULT_WIDTH,
+        SETTINGS_COLLAPSED, SETTINGS_EXPANDED,
+    },
     settings::{self, Preset, Settings},
 };
 use startup::{set_startup, startup_enabled};
@@ -48,9 +50,7 @@ const TOGGLE: u16 = 102;
 const QUIT: u16 = 104;
 const STATUS_SWITCH: u16 = 110;
 const NAV_SETTINGS: u16 = 120;
-const NAV_PROFILES: u16 = 121;
 const NAV_ABOUT: u16 = 122;
-const NAV_ACTIVITY: u16 = 123;
 const EXCLUDE_ADD: u16 = 130;
 const PRESET: u16 = 135;
 const EXCLUSION_PANEL: u16 = 217;
@@ -70,6 +70,8 @@ struct Ui {
     toggle_motion: [scrollpilot::control_motion::Toggle; 4],
     toggle_initialized: bool,
     toggle_time: f64,
+    reveal: scrollpilot::control_motion::Reveal,
+    reveal_time: f64,
     shared: Arc<Shared>,
     path: PathBuf,
     inputs: [usize; 6],
@@ -147,6 +149,8 @@ impl Ui {
             toggle_motion: Default::default(),
             toggle_initialized: false,
             toggle_time: 0.,
+            reveal: Default::default(),
+            reveal_time: 0.,
             shared,
             path,
             inputs: [0; 6],
@@ -249,7 +253,7 @@ impl Ui {
             "BUTTON",
             title,
             WS_TABSTOP
-                | if matches!(id, NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT) {
+                | if matches!(id, NAV_SETTINGS | NAV_ABOUT) {
                     BS_AUTORADIOBUTTON as u32 | if id == NAV_SETTINGS { WS_GROUP } else { 0 }
                 } else if checkable {
                     BS_AUTOCHECKBOX as u32
@@ -287,14 +291,13 @@ impl Ui {
         self.button("Maximize", WINDOW_MAXIMIZE, false, false);
         self.button("Close to tray", WINDOW_CLOSE, false, false);
         self.button("Settings", NAV_SETTINGS, false, false);
-        self.button("App profiles", NAV_PROFILES, false, false);
-        self.button("Activity", NAV_ACTIVITY, false, false);
         self.button("About", NAV_ABOUT, false, false);
         self.button("Apply settings", APPLY, false, false);
         self.toggle = self.button("Enable smoothing", TOGGLE, false, false);
         self.static_text("Alt + P pauses or resumes.", 904, false, self.fonts.small);
         let opts = self.shared.settings.read().unwrap().clone();
         self.preset = opts.preset;
+        self.reveal.target(self.preset == Preset::Custom, false);
         let combo = self.create(
             "COMBOBOX",
             "Scrolling preset",
@@ -429,8 +432,6 @@ impl Ui {
         self.button("Reset", RESET_PREVIEW, true, false);
         self.static_text("Scroll Mage", 1120, true, self.fonts.brand);
         self.static_text(concat!("Version ", env!("CARGO_PKG_VERSION"), "\r\n\r\nScroll Mage is a scrolling extension for Windows that makes mouse wheel scrolling feel more natural, consistent, and customizable. It is built for desktop mice; touchpad scrolling is left to Windows. Your settings stay on this computer.\r\n\r\nAdd an app to Excluded apps to keep its own scrolling. Scroll settings apply to all other apps.\r\n\r\nScroll Test lets you try momentum and elastic edges. Other apps control how they move their content.\r\n\r\nClose the window to keep Scroll Mage in the tray. Use the tray menu to quit."),1121,true,self.fonts.body);
-        self.build_profiles();
-        self.build_activity();
         self.ready = true;
         self.loading_controls = false;
         self.sync_preset_controls();
@@ -442,6 +443,7 @@ impl Ui {
     }
     fn shell(&self) -> Shell {
         Shell::with_exclusions(self.width, self.height, self.excluded_apps.len())
+            .with_settings_height(self.settings_height())
     }
     unsafe fn layout(&mut self) {
         if !self.ready || IsIconic(self.hwnd as HWND) != 0 {
@@ -469,10 +471,7 @@ impl Ui {
             },
         );
         self.at(TITLE_LOGO, Rect::new(20, 4, 120, 40));
-        for (i, id) in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT]
-            .into_iter()
-            .enumerate()
-        {
+        for (i, id) in [NAV_SETTINGS, NAV_ABOUT].into_iter().enumerate() {
             self.at(id, Rect::new(16, 72 + i as i32 * 52, shell.rail - 32, 44));
         }
         self.at(TOGGLE, Rect::new(16, self.height - 66, shell.rail - 32, 40));
@@ -511,10 +510,6 @@ impl Ui {
         }
         let content_h = if self.view == NAV_SETTINGS {
             shell.content_height()
-        } else if self.view == NAV_PROFILES {
-            720
-        } else if self.view == NAV_ACTIVITY {
-            self.activity_layout().height
         } else {
             shell.body.h
         };
@@ -551,7 +546,10 @@ impl Ui {
             self.at(1110, Rect::new(c.x + 20, c.y + 45, c.w - 190, 22));
             self.at(PRESET, Rect::new(c.x + c.w - 160, c.y + 14, 140, 160));
             for i in 0..6 {
-                let y = c.y + FORM_ROW_START + i * FORM_ROW_GAP + if i >= 4 { 8 } else { 0 };
+                if !form_row_visible(i, c.h) {
+                    continue;
+                }
+                let y = c.y + form_row_y(i);
                 let input_x = c.x + c.w - 124;
                 self.at(
                     1000 + i as u16,
@@ -599,10 +597,6 @@ impl Ui {
             let c = cards[3];
             self.at(216, Rect::new(c.x, c.y, c.w, c.h));
             self.at(RESET_PREVIEW, Rect::new(c.x + c.w - 99, c.y + 14, 79, 30));
-        } else if self.view == NAV_PROFILES {
-            self.layout_profiles();
-        } else if self.view == NAV_ACTIVITY {
-            self.layout_activity(&self.activity_layout());
         } else {
             self.at(1120, Rect::new(32, 30, w - 80, 46));
             self.at(
@@ -612,7 +606,7 @@ impl Ui {
         }
         InvalidateRect(self.hwnd as HWND, null(), 0);
         InvalidateRect(self.body as HWND, null(), 0);
-        for id in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT] {
+        for id in [NAV_SETTINGS, NAV_ABOUT] {
             InvalidateRect(self.handle(id) as HWND, null(), 0);
         }
     }
@@ -621,7 +615,6 @@ impl Ui {
         let (title, copy) = self.shared.status_text();
         set(self.status_title, &title);
         set(self.status, copy.lines().next().unwrap_or(""));
-        self.update_activity(&title, &copy);
         set(
             self.toggle,
             if enabled {
@@ -637,7 +630,7 @@ impl Ui {
     }
     unsafe fn navigate(&mut self, view: u16) {
         self.view = view;
-        for id in [NAV_SETTINGS, NAV_PROFILES, NAV_ACTIVITY, NAV_ABOUT] {
+        for id in [NAV_SETTINGS, NAV_ABOUT] {
             check(self.handle(id), id == view);
         }
         self.scroll = 0;
@@ -762,8 +755,10 @@ impl Ui {
             let c = cards[0];
             let locked = self.preset.fixed();
             for i in 0..6 {
-                let y = c.y + FORM_ROW_START + i * FORM_ROW_GAP + if i >= 4 { 8 } else { 0 }
-                    - self.scroll;
+                if !form_row_visible(i, c.h) {
+                    continue;
+                }
+                let y = c.y + form_row_y(i) - self.scroll;
                 round(
                     dc,
                     Rect::new(c.x + c.w - 124, y, 104, 36),
@@ -815,8 +810,6 @@ impl Ui {
                     BORDER
                 }),
             );
-        } else if self.view == NAV_ACTIVITY {
-            self.paint_activity(dc);
         } else {
             round(
                 dc,
@@ -964,7 +957,7 @@ impl Ui {
         GetClientRect(h, &mut client);
         let w = (f64::from(client.right) / self.scale).ceil() as i32;
         let height = (f64::from(client.bottom) / self.scale).ceil() as i32;
-        let is_nav = matches!(id, NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT);
+        let is_nav = matches!(id, NAV_SETTINGS | NAV_ABOUT);
         let in_body = self.controls.iter().any(|c| c.1 == h as usize && c.2);
         let bg = if is_nav || id == TOGGLE {
             RAIL
@@ -1084,11 +1077,9 @@ impl Ui {
                 );
             }
             let tint = if selected { ACCENT_TEXT } else { MUTED };
-            // Segoe MDL2 Assets: Setting, AllApps, Diagnostic, Info.
+            // Segoe MDL2 Assets: Setting, Info.
             let glyph = match id {
                 NAV_SETTINGS => "\u{E713}",
-                NAV_PROFILES => "\u{E71D}",
-                NAV_ACTIVITY => "\u{E9D9}",
                 _ => "\u{E946}",
             };
             if w >= 140 {
@@ -1271,8 +1262,7 @@ unsafe extern "system" fn static_label(
             || id == 903
             || id == 904
             || (1010..1016).contains(&id)
-            || (1110..1116).contains(&id)
-            || activity::muted(id);
+            || (1110..1116).contains(&id);
         let rect = Rect::new(
             0,
             0,
@@ -1461,7 +1451,6 @@ unsafe fn colors(ui: &Ui, msg: u32, w: usize, l: isize) -> Option<isize> {
                     || id == 904
                     || (1010..1016).contains(&id)
                     || (1110..1116).contains(&id)
-                    || activity::muted(id)
                 {
                     MUTED
                 } else {
@@ -1609,6 +1598,10 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             }
             0
         }
+        WM_TIMER if w == reveal::REVEAL_TIMER => {
+            ui.step_reveal();
+            0
+        }
         WM_TIMER if w == 6 => {
             let now = ui.shared.now();
             ui.step_toggles((now - ui.toggle_time).max(0.) / 1000.);
@@ -1710,23 +1703,12 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
             ui.draw_preset_item(&*(l as *const DRAWITEMSTRUCT));
             1
         }
-        WM_DRAWITEM if w == 3003 => {
-            ui.draw_app_profile_item(&*(l as *const DRAWITEMSTRUCT));
-            1
-        }
-        WM_MEASUREITEM if w == 3003 => {
-            (*(l as *mut MEASUREITEMSTRUCT)).itemHeight = ui.px(28) as u32;
-            1
-        }
         WM_MEASUREITEM if w == PRESET as usize => {
             (*(l as *mut MEASUREITEMSTRUCT)).itemHeight = ui.px(32) as u32;
             1
         }
         WM_COMMAND => {
             let id = (w & 0xffff) as u16;
-            if ui.profile_command(id, (w >> 16) as u32) {
-                return 0;
-            }
             if (201..207).contains(&id) && (w >> 16) as u32 == EN_CHANGE {
                 if ui.ready && !ui.loading_controls {
                     ui.note.clear();
@@ -1760,9 +1742,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
                     ui.select_preset()
                 }
                 TOGGLE | STATUS_SWITCH => ui.toggle(),
-                NAV_SETTINGS | NAV_PROFILES | NAV_ACTIVITY | NAV_ABOUT => {
-                    ui.navigate((w & 0xffff) as u16)
-                }
+                NAV_SETTINGS | NAV_ABOUT => ui.navigate((w & 0xffff) as u16),
                 EXCLUDE_ADD => ui.add_exclusion(),
                 id if (EXCLUSION_ROW..EXCLUSION_ROW + 256).contains(&id) && id % 2 == 1 => {
                     PostMessageW(
@@ -1828,6 +1808,7 @@ unsafe extern "system" fn window(h: HWND, msg: u32, w: usize, l: isize) -> isize
         WM_DESTROY => {
             KillTimer(h, 5);
             KillTimer(h, 6);
+            KillTimer(h, reveal::REVEAL_TIMER);
             KillTimer(ui.pad as HWND, 1);
             ui.tray(NIM_DELETE);
             UnregisterHotKey(h, 1);

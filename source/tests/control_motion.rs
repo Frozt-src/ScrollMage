@@ -38,3 +38,33 @@ fn toggle_motion_does_not_depend_on_refresh_rate() {
     }
     assert!((slow.position() - fast.position()).abs() < 1e-12);
 }
+
+#[test]
+fn settings_reveal_opens_with_an_elastic_overshoot_and_closes_without_one() {
+    use scrollpilot::control_motion::Reveal;
+    let (shut, open) = (80, 320);
+    let mut r = Reveal::default();
+    r.target(true, true);
+    let mut peak = 0;
+    let mut frames = 0;
+    while r.step(1. / 60.) {
+        peak = peak.max(r.height(shut, open));
+        frames += 1;
+        assert!(frames < 120, "Reveal must settle within two seconds");
+    }
+    assert_eq!(r.height(shut, open), open);
+    assert!(
+        peak > open + 10,
+        "Opening should overshoot a little: {peak}"
+    );
+    assert!(peak < open + 60, "but not wildly: {peak}");
+    r.target(false, true);
+    let mut low = open;
+    while r.step(1. / 60.) {
+        low = low.min(r.height(shut, open));
+    }
+    assert_eq!(r.height(shut, open), shut);
+    assert!(low >= shut, "Closing never cuts into the preset row");
+    r.target(true, false);
+    assert_eq!(r.height(shut, open), open, "Without animation it snaps");
+}

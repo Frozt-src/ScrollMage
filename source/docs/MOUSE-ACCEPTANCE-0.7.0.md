@@ -6,13 +6,13 @@ Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scr
 
 1. Quit the existing app using **Quit Scroll Mage** in its tray menu. Closing the window only hides it. Do not run two copies together.
 2. Extract the complete candidate ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.7.0**.
-3. Open Activity and verify smoothing is enabled. Fresh candidate defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
+3. Check that the Options card shows smoothing enabled. Fresh candidate defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
 
 ## Record these results
 
 | Check | Expected result | Your result |
 | --- | --- | --- |
-| Normal wheel in a browser, File Explorer and your usual editor | Activity reports accepted/emitted input for an eligible app; visible behavior is usable without jumps or missing input. Some apps accumulate small deltas into line steps. | |
+| Normal wheel in a browser, File Explorer and your usual editor | Visible behavior is usable without jumps or missing input. Some apps accumulate small deltas into line steps. | |
 | Slow notches in Super smooth | Precise scrolling without an unwanted long coast. | |
 | Quick flick in Super smooth | Several rapid notches produce fast scrolling that continues and gradually slows. This does not physically unlock the mouse wheel. | |
 | Brake a coast separately by reversal, primary click, auxiliary mouse button and Alt+P | Movement stops promptly; pause stays paused until resumed. | |
@@ -21,12 +21,12 @@ Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scr
 | Shift + wheel / native sideways wheel if present | Horizontal scrolling follows the selected option; changing Shift during a coast does not turn an old tail into a new app command. | |
 | Touchpad, if this PC has one | Two-finger scrolling looks and feels the same with Scroll Mage running as with it quit. If it differs, record the touchpad and driver: a driver that imitates a notched wheel cannot be told apart from a mouse. | |
 | Ctrl/Alt + wheel and elevated apps | Modifier gestures remain native. An elevated target may be bypassed with an explanation rather than silently claiming delivery. | |
-| Sleep/resume and an extended normal session | No stuck coast, lost input, persistent high CPU or growing memory/handle trend. Report the time and Activity text if input stops being accepted. | |
+| Sleep/resume and an extended normal session | No stuck coast, lost input, persistent high CPU or growing memory/handle trend. Report the time and status text if input stops being accepted. | |
 | Maximize hover, resize, mixed DPI and text scaling | Snap flyout appears; text and controls remain visible and reachable. | |
 | Keyboard, Narrator and high contrast | Controls can be identified and operated; focus and state are understandable. High-contrast compatibility is still an open engineering/acceptance item, not certified by this checklist. | |
 | Tray recovery and sign-in | Tray entry survives an Explorer restart when you next perform one. If you choose to enable sign-in, verify the candidate opens after sign-in; after moving the portable folder, the stale path should no longer appear enabled. | |
 
-Record the mouse model, Windows build, app versions, preset, exclusions and exact failure steps with each issue. A screenshot of Activity helps distinguish bypass from accepted input that the receiving app renders in steps.
+Record the mouse model, Windows build, app versions, preset, exclusions and exact failure steps with each issue. A screenshot of the Options card status helps distinguish bypass from accepted input that the receiving app renders in steps.
 
 ## Optional automated packaged check
 

@@ -4,6 +4,10 @@
 
 Includes everything from the 0.6.10 candidate of 2026-10-21, which was published as a prerelease only.
 
+- Add a **Custom** preset for your own tuning. Default is now a fixed preset like macOS style and Super smooth. Settings where Default had been edited open as Custom with the same values.
+- Collapse the Scroll settings card to the preset picker for fixed presets; choosing Custom opens it with an elastic slide that moves Options down. Windows' "Show animations" setting is respected.
+- Remove the App profiles and Activity pages. Saved app profiles are kept in settings and still apply.
+
 
 - Fix settings saves that exceeded the loader's 64 KiB limit; oversized saves now preserve the last valid file. Reads are bounded before parsing.
 - Use exclusively created temporary settings files and remove them on failure.

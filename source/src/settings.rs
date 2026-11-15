@@ -3,8 +3,13 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct Settings {
     pub preset: Preset,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_tuning: Option<Tuning>,
+    /// The user's own values, kept while a fixed preset is active.
+    #[serde(
+        default,
+        alias = "default_tuning",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub custom_tuning: Option<Tuning>,
     pub distance: f64,
     pub omega: f64,
     pub acceleration_ms: f64,
@@ -25,17 +30,24 @@ pub enum Preset {
     Default,
     MacosStyle,
     SuperSmooth,
+    Custom,
 }
 impl Preset {
-    pub const ALL: [Self; 3] = [Self::Default, Self::MacosStyle, Self::SuperSmooth];
+    pub const ALL: [Self; 4] = [
+        Self::Default,
+        Self::MacosStyle,
+        Self::SuperSmooth,
+        Self::Custom,
+    ];
+    /// Every preset except Custom has fixed values.
     pub fn fixed(self) -> bool {
-        self != Self::Default
+        self != Self::Custom
     }
-    /// Canonical values for this preset; Default can be edited in Settings.
+    /// Canonical values for this preset; Custom starts from Default's values.
     pub fn tuning(self) -> Tuning {
         let [distance, omega, acceleration_ms, acceleration_max, friction, elastic_omega] =
             match self {
-                Self::Default => [120., 30., 70., 1., 4., 22.],
+                Self::Default | Self::Custom => [120., 30., 70., 1., 4., 22.],
                 // Soft, long ease-out with strong speed-based acceleration:
                 // slow notches stay precise, fast spins travel much further.
                 Self::MacosStyle => [120., 14., 140., 4., 4.5, 24.],
@@ -56,6 +68,7 @@ impl Preset {
             Self::Default => "Default",
             Self::MacosStyle => "macOS style",
             Self::SuperSmooth => "Super smooth",
+            Self::Custom => "Custom",
         }
     }
     fn wheel(self) -> WheelTuning {
@@ -122,7 +135,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             preset: Preset::Default,
-            default_tuning: None,
+            custom_tuning: None,
             distance: 120.,
             omega: 30.,
             acceleration_ms: 70.,
@@ -158,19 +171,21 @@ impl Settings {
         self.friction = tuning.friction;
         self.elastic_omega = tuning.elastic_omega;
     }
-    /// Remember the editable Default while switching between fixed presets.
+    /// Remember Custom's values while a fixed preset is active. Custom starts
+    /// from the active preset's values the first time it is chosen.
     pub fn select_preset(&mut self, preset: Preset) {
-        if self.preset == Preset::Default {
-            if preset == Preset::Default {
-                return;
-            }
-            self.default_tuning = Some(self.tuning());
+        if self.preset == preset {
+            return;
         }
+        if self.preset == Preset::Custom {
+            self.custom_tuning = Some(self.tuning());
+        }
+        let current = self.tuning();
         self.preset = preset;
         self.set_tuning(if preset.fixed() {
             preset.tuning()
         } else {
-            self.default_tuning.unwrap_or_else(|| preset.tuning())
+            self.custom_tuning.unwrap_or(current)
         });
     }
     /// Our Windows wheel tuning, not Apple's private scrolling constants.
@@ -179,16 +194,23 @@ impl Settings {
         self.select_preset(preset);
     }
     /// Normalize legacy preset values without discarding per-app overrides.
+    /// Default used to be editable: edited Default values become Custom.
     pub fn migrate_profiles(&mut self) {
+        if self.preset == Preset::Default && self.tuning() != Preset::Default.tuning() {
+            self.preset = Preset::Custom;
+        }
         if self.preset.fixed() {
             let canonical = self.preset.tuning();
-            if self.default_tuning.is_none() && self.tuning() != canonical {
-                self.default_tuning = Some(self.tuning());
+            if self.custom_tuning.is_none() && self.tuning() != canonical {
+                self.custom_tuning = Some(self.tuning());
             }
             self.set_tuning(canonical);
         }
         for profile in &mut self.profiles {
-            if let Some(preset) = profile.preset.filter(|preset| preset.fixed()) {
+            if let Some(preset) = profile
+                .preset
+                .filter(|preset| matches!(preset, Preset::MacosStyle | Preset::SuperSmooth))
+            {
                 profile.distance = preset.tuning().distance;
                 profile.omega = preset.tuning().omega;
             }
@@ -196,7 +218,7 @@ impl Settings {
     }
     pub fn validate(&self) -> Result<(), String> {
         self.tuning().validate()?;
-        if let Some(tuning) = self.default_tuning {
+        if let Some(tuning) = self.custom_tuning {
             tuning.validate()?;
         }
         if self.exclusions.len() > 128
@@ -254,7 +276,10 @@ impl Settings {
             .iter()
             .find(|p| !p.bypass && p.executable.eq_ignore_ascii_case(name))
         {
-            if let Some(preset) = p.preset.filter(|preset| preset.fixed()) {
+            if let Some(preset) = p
+                .preset
+                .filter(|preset| matches!(preset, Preset::MacosStyle | Preset::SuperSmooth))
+            {
                 return preset.wheel();
             }
             tuning.distance = p.distance;
@@ -326,11 +351,14 @@ pub fn format_profiles(profiles: &[Profile]) -> String {
         .map(|p| {
             if p.bypass {
                 format!("{} | off", p.executable)
-            } else if let Some(preset) = p.preset.filter(|preset| preset.fixed()) {
+            } else if let Some(preset) = p
+                .preset
+                .filter(|preset| matches!(preset, Preset::MacosStyle | Preset::SuperSmooth))
+            {
                 let name = match preset {
                     Preset::MacosStyle => "macos_style",
                     Preset::SuperSmooth => "super_smooth",
-                    Preset::Default => unreachable!(),
+                    Preset::Default | Preset::Custom => unreachable!(),
                 };
                 format!("{} | {}", p.executable, name)
             } else {

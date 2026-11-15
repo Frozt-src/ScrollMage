@@ -16,14 +16,6 @@ fn hidden_native_preset_rows_follow_live_dpi_changes() {
             (&rect as *const RECT) as isize,
         );
         assert_eq!(
-            SendMessageW(ui.handle(3003) as HWND, CB_GETITEMHEIGHT, usize::MAX, 0),
-            56
-        );
-        assert_eq!(
-            SendMessageW(ui.handle(3003) as HWND, CB_GETITEMHEIGHT, 0, 0),
-            56
-        );
-        assert_eq!(
             SendMessageW(ui.handle(PRESET) as HWND, CB_GETITEMHEIGHT, usize::MAX, 0),
             56
         );
@@ -38,42 +30,7 @@ fn hidden_native_preset_rows_follow_live_dpi_changes() {
 }
 
 #[test]
-fn hidden_native_profile_errors_preserve_saved_and_active_settings() {
-    unsafe {
-        let _graphics = GraphicsToken::start().unwrap();
-        let mut ui = hidden(1.);
-        set(ui.handle(3002), "Editor.exe");
-        set(ui.handle(3004), "72");
-        set(ui.handle(3005), "35");
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
-        let good_path = ui.path.clone();
-        let original = std::fs::read(&good_path).unwrap();
-        set(ui.handle(3004), "0");
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
-        assert_eq!(std::fs::read(&good_path).unwrap(), original);
-        assert_eq!(
-            ui.shared
-                .settings
-                .read()
-                .unwrap()
-                .for_app("Editor.exe")
-                .distance,
-            72.
-        );
-        set(ui.handle(3004), "80");
-        ui.path = good_path.join("missing/settings.json");
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3007, 0);
-        assert_eq!(ui.shared.settings.read().unwrap().profiles.len(), 1);
-        assert_eq!(std::fs::read(&good_path).unwrap(), original);
-        std::fs::remove_file(good_path).unwrap();
-        DestroyWindow(ui.hwnd as HWND);
-        DeleteObject(ui.brush as HGDIOBJ);
-    }
-}
-
-#[test]
-fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
+fn hidden_native_settings_card_fits_collapsed_and_custom_at_supported_scales() {
     unsafe {
         let _graphics = GraphicsToken::start().unwrap();
         for scale in [1., 1.25, 1.5, 1.75, 2.] {
@@ -90,10 +47,38 @@ fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
                 );
                 ui.layout();
-                set(ui.handle(3002), "Editor.exe");
-                SendMessageW(hwnd, WM_COMMAND, 3006, 0);
-                for (page, name) in [(NAV_PROFILES, "app-profiles"), (NAV_ACTIVITY, "activity")] {
-                    ui.navigate(page);
+                for (custom, name) in [(false, "settings-collapsed"), (true, "settings-custom")] {
+                    ui.preset = if custom {
+                        Preset::Custom
+                    } else {
+                        Preset::Default
+                    };
+                    ui.reveal.target(custom, false);
+                    ui.navigate(NAV_SETTINGS);
+                    let cards = ui.shell().cards();
+                    assert_eq!(
+                        cards[0].h,
+                        if custom {
+                            SETTINGS_EXPANDED
+                        } else {
+                            SETTINGS_COLLAPSED
+                        }
+                    );
+                    assert_eq!(
+                        cards[1].y,
+                        cards[0].y + cards[0].h + 16,
+                        "Options follow the card"
+                    );
+                    for i in 0..6u16 {
+                        assert_eq!(
+                            IsWindowVisible(ui.inputs[i as usize] as HWND) != 0
+                                || GetWindowLongW(ui.inputs[i as usize] as HWND, GWL_STYLE) as u32
+                                    & WS_VISIBLE
+                                    != 0,
+                            custom,
+                            "Tuning rows show only for Custom"
+                        );
+                    }
                     let surface = Surface::new(ui.px(ui.width), ui.px(ui.height));
                     ui.paint_main(surface.dc);
                     let saved = SaveDC(surface.dc);
@@ -105,7 +90,7 @@ fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
                     );
                     ui.paint_body(surface.dc);
                     RestoreDC(surface.dc, saved);
-                    for &(id, handle, in_body) in &ui.controls {
+                    for &(_, handle, in_body) in &ui.controls {
                         if GetWindowLongW(handle as HWND, GWL_STYLE) as u32 & WS_VISIBLE == 0 {
                             continue;
                         }
@@ -132,18 +117,6 @@ fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
                             child.dc as usize,
                             PRF_CLIENT as isize,
                         );
-                        if id == 3003 {
-                            GdiFlush();
-                            let pixels = std::slice::from_raw_parts(
-                                child.pixels,
-                                (child.w * child.h) as usize,
-                            );
-                            assert!(
-                                pixels.iter().filter(|p| **p & 0xffffff == WHITE).count()
-                                    > pixels.len() / 2,
-                                "App profile selector must paint an opaque light field"
-                            );
-                        }
                         let saved = SaveDC(surface.dc);
                         if in_body {
                             let b = ui.shell().body;
@@ -165,72 +138,13 @@ fn hidden_native_new_pages_fit_and_render_at_supported_scales() {
                         "target/headless-ui/{name}-{}-{width}.bmp",
                         (scale * 100.) as i32
                     )));
-                    if page == NAV_PROFILES {
-                        ui.scroll = 10000;
-                        ui.layout();
-                        let mut r: RECT = zeroed();
-                        GetWindowRect(ui.handle(3012) as HWND, &mut r);
-                        let mut bottom = POINT {
-                            x: r.right,
-                            y: r.bottom,
-                        };
-                        ScreenToClient(ui.body as HWND, &mut bottom);
-                        assert!(
-                            bottom.y <= ui.px(ui.shell().body.h),
-                            "Last profile help must be reachable"
-                        );
-                        ui.scroll = 0;
-                    }
                 }
                 assert_eq!(IsWindowVisible(hwnd), 0);
-                std::fs::remove_file(&ui.path).unwrap();
+                let _ = std::fs::remove_file(&ui.path);
                 DestroyWindow(hwnd);
                 DeleteObject(ui.brush as HGDIOBJ);
             }
         }
-    }
-}
-
-#[test]
-fn hidden_native_app_profiles_save_without_committing_global_drafts() {
-    unsafe {
-        let _graphics = GraphicsToken::start().unwrap();
-        let ui = hidden(1.);
-        assert_ne!(ui.handle(3002), 0, "The app profile editor must exist");
-        set(ui.inputs[0], "177");
-        set(ui.handle(3002), "Editor.exe");
-        set(ui.handle(3004), "72");
-        set(ui.handle(3005), "35");
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
-        let saved = settings::load(&ui.path).unwrap();
-        assert_eq!(saved.distance, 120.);
-        assert_eq!(saved.for_app("EDITOR.EXE").distance, 72.);
-        assert_eq!(
-            ui.shared
-                .settings
-                .read()
-                .unwrap()
-                .for_app("Editor.exe")
-                .omega,
-            35.
-        );
-        assert_eq!(text(ui.inputs[0]), "177");
-        SendMessageW(ui.handle(3003) as HWND, CB_SETCURSEL, 2, 0);
-        SendMessageW(
-            ui.hwnd as HWND,
-            WM_COMMAND,
-            3003 | ((CBN_SELCHANGE as usize) << 16),
-            0,
-        );
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3006, 0);
-        let saved = settings::load(&ui.path).unwrap();
-        assert_eq!(saved.for_app("Editor.exe").omega, SMOOTH_OMEGA);
-        assert_eq!(IsWindowEnabled(ui.handle(3004) as HWND), 0);
-        SendMessageW(ui.hwnd as HWND, WM_COMMAND, 3007, 0);
-        assert!(settings::load(&ui.path).unwrap().profiles.is_empty());
-        std::fs::remove_file(&ui.path).unwrap();
-        DestroyWindow(ui.hwnd as HWND);
-        DeleteObject(ui.brush as HGDIOBJ);
     }
 }
 
@@ -266,17 +180,36 @@ fn hidden_native_maximize_exposes_the_snap_hit_target() {
 }
 
 #[test]
-fn hidden_native_fixed_presets_apply_and_default_remembers_custom_tuning() {
+fn hidden_native_custom_reveals_tuning_and_fixed_presets_collapse_it() {
     unsafe {
         let _graphics = GraphicsToken::start().unwrap();
         let mut ui = hidden(1.);
-        assert!(!text(ui.handle(1110)).contains("Custom"));
-        set(ui.inputs[0], "177");
-        assert!(text(ui.handle(1110)).contains("Custom"));
-        ui.apply();
-        assert!(text(ui.handle(1110)).contains("Custom"));
-        check(ui.reverse, true); // Unrelated option draft must not be auto-applied.
         let combo = ui.handle(PRESET) as HWND;
+        assert_eq!(SendMessageW(combo, CB_GETCOUNT, 0, 0), 4);
+        assert_eq!(ui.shell().cards()[0].h, SETTINGS_COLLAPSED);
+        assert_eq!(
+            GetWindowLongW(ui.inputs[0] as HWND, GWL_STYLE) as u32 & WS_VISIBLE,
+            0
+        );
+        SendMessageW(combo, CB_SETCURSEL, 3, 0);
+        ui.select_preset();
+        assert_eq!(ui.shared.settings.read().unwrap().preset, Preset::Custom);
+        assert!(ui.reveal.open());
+        assert_eq!(ui.shell().cards()[0].h, SETTINGS_EXPANDED);
+        assert_ne!(
+            GetWindowLongW(ui.inputs[0] as HWND, GWL_STYLE) as u32 & WS_VISIBLE,
+            0
+        );
+        assert_ne!(IsWindowEnabled(ui.inputs[0] as HWND), 0);
+        assert_eq!(
+            text(ui.inputs[0]),
+            "120",
+            "Custom starts from Default's values"
+        );
+        set(ui.inputs[0], "177");
+        ui.apply();
+        assert_eq!(settings::load(&ui.path).unwrap().distance, 177.);
+        check(ui.reverse, true); // Unrelated option draft must not be auto-applied.
         SendMessageW(combo, CB_SETCURSEL, 2, 0);
         ui.select_preset();
         assert_eq!(
@@ -287,17 +220,21 @@ fn hidden_native_fixed_presets_apply_and_default_remembers_custom_tuning() {
         assert!(ui.shared.settings.read().unwrap().wheel().free_spin);
         assert!(text(ui.handle(1110)).contains("Flick to coast"));
         assert!(!ui.shared.settings.read().unwrap().reverse);
-        assert_eq!(IsWindowEnabled(ui.inputs[0] as HWND), 0);
-        let before = text(ui.inputs[0]);
-        ui.step(400);
-        assert_eq!(text(ui.inputs[0]), before);
+        assert!(!ui.reveal.open());
+        assert_eq!(ui.shell().cards()[0].h, SETTINGS_COLLAPSED);
+        assert_eq!(
+            GetWindowLongW(ui.inputs[0] as HWND, GWL_STYLE) as u32 & WS_VISIBLE,
+            0
+        );
         SendMessageW(combo, CB_SETCURSEL, 0, 0);
         ui.select_preset();
-        assert_eq!(text(ui.inputs[0]), "177");
-        assert!(text(ui.handle(1110)).contains("Custom"));
+        assert_eq!(ui.shared.settings.read().unwrap().distance, 120.);
+        assert!(!ui.reveal.open(), "Default is a fixed preset");
+        SendMessageW(combo, CB_SETCURSEL, 3, 0);
+        ui.select_preset();
+        assert_eq!(text(ui.inputs[0]), "177", "Custom keeps the user's values");
         assert_eq!(ui.shared.settings.read().unwrap().distance, 177.);
         assert!(!ui.shared.settings.read().unwrap().wheel().free_spin);
-        assert_ne!(IsWindowEnabled(ui.inputs[0] as HWND), 0);
         assert!(checked(ui.reverse));
         std::fs::remove_file(&ui.path).unwrap();
         DestroyWindow(ui.hwnd as HWND);
@@ -839,6 +776,11 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
             );
             ui.remove_exclusion(initial_count);
             set(ui.exclusion_input, "");
+            // Open the Custom rows so editable controls sit behind the popup.
+            ui.preset = Preset::Custom;
+            ui.reveal.target(true, false);
+            ui.sync_preset_controls();
+            ui.layout();
             set(ui.inputs[0], "120");
             // The actual native popup stays hidden while we verify alpha and clipping.
             let mut combo_info: windows_sys::Win32::UI::Controls::COMBOBOXINFO = zeroed();
@@ -1017,7 +959,8 @@ fn hidden_native_controls_keep_tuning_layout_and_pixels_consistent() {
             assert_eq!(saved.omega, SMOOTH_OMEGA);
             assert_eq!(saved.exclusions, Settings::default().exclusions);
             std::fs::remove_file(&ui.path).unwrap();
-            SendMessageW(combo, CB_SETCURSEL, 0, 0);
+            // Back to the editable preset for the stepper and layout checks below.
+            SendMessageW(combo, CB_SETCURSEL, 3, 0);
             ui.select_preset();
             ui.note.clear();
             ui.update();

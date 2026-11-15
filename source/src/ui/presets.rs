@@ -236,13 +236,7 @@ pub(super) unsafe extern "system" fn preset_combo(
         return DefSubclassProc(h, msg, w, l);
     }
     let ui = &*ptr;
-    let paint = |dc: HDC, width: i32, height: i32| {
-        if GetDlgCtrlID(h) == 3003 {
-            ui.paint_app_profile_combo(h, dc, width, height);
-        } else {
-            ui.paint_preset(h, dc, width, height);
-        }
-    };
+    let paint = |dc: HDC, width: i32, height: i32| ui.paint_preset(h, dc, width, height);
     match msg {
         WM_PAINT => {
             buffered(h, paint);

@@ -196,7 +196,7 @@ fn repeated_flicks_are_bounded_and_axes_are_independent() {
 
 #[test]
 fn free_spin_belongs_only_to_the_selected_super_smooth_profile() {
-    for preset in [Preset::Default, Preset::MacosStyle] {
+    for preset in [Preset::Default, Preset::MacosStyle, Preset::Custom] {
         let mut settings = Settings::default();
         settings.select_preset(preset);
         let mut engine = flick(&settings);

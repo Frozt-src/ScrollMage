@@ -129,3 +129,23 @@ fn compact_exclusion_entry_is_right_aligned_with_room_for_three_rows() {
         assert!(shell.exclusion_viewport().h >= 3 * 32 - 6);
     }
 }
+
+#[test]
+fn collapsed_settings_card_pulls_the_following_cards_up() {
+    use scrollpilot::layout::{form_row_visible, SETTINGS_COLLAPSED, SETTINGS_EXPANDED};
+    for width in [700, 1140] {
+        let open = Shell::new(width, 768).cards();
+        let shut = Shell::new(width, 768)
+            .with_settings_height(SETTINGS_COLLAPSED)
+            .cards();
+        assert_eq!(open[0].h, SETTINGS_EXPANDED);
+        assert_eq!(shut[0].h, SETTINGS_COLLAPSED);
+        let lift = SETTINGS_EXPANDED - SETTINGS_COLLAPSED;
+        assert_eq!(shut[1].y, open[1].y - lift, "Options move up with the card");
+        assert_eq!(shut[1].y, shut[0].y + shut[0].h + 16);
+    }
+    assert!((0..6).all(|i| !form_row_visible(i, SETTINGS_COLLAPSED)));
+    assert!((0..6).all(|i| form_row_visible(i, SETTINGS_EXPANDED)));
+    let partly = 160;
+    assert!(form_row_visible(0, partly) && !form_row_visible(5, partly));
+}

@@ -8,6 +8,7 @@ fn wheel_notch_drains_exponentially_from_full_speed() {
     let s = Settings {
         distance: 120.,
         acceleration_max: 1.,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     };
     let mut engine = Engine::default();
@@ -21,6 +22,7 @@ fn fractional_travel_is_preserved_between_separate_notches() {
     let s = Settings {
         distance: 120.25,
         acceleration_max: 1.,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     };
     let mut engine = Engine::default();
@@ -37,6 +39,7 @@ fn fractional_travel_is_preserved_between_separate_notches() {
 fn a_second_notch_adds_to_the_motion_already_under_way() {
     let s = Settings {
         acceleration_max: 1.,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     };
     let mut engine = Engine::default();

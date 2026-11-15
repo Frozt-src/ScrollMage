@@ -89,6 +89,7 @@ fn profiles_override_only_the_selected_app_and_reject_ambiguity() {
     );
     let s = Settings {
         profiles,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     };
     assert_eq!(s.for_app("EDITOR.EXE").distance, 72.);
@@ -121,6 +122,7 @@ fn fixed_profiles_roundtrip_with_preset_identity() {
         acceleration_ms: 300.,
         acceleration_max: 7.,
         profiles,
+        preset: scrollpilot::settings::Preset::Custom,
         ..Settings::default()
     };
     assert_eq!(

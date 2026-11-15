@@ -212,8 +212,8 @@ fn legacy_fixed_preset_is_canonical_and_preserves_manual_tuning() {
     assert_eq!(json["preset"], "macos_style");
     assert_eq!(json["distance"], 120.0);
     assert_eq!(json["omega"], Preset::MacosStyle.tuning().omega);
-    assert_eq!(json["default_tuning"]["distance"], 156.0);
-    assert_eq!(json["default_tuning"]["omega"], 26.0);
+    assert_eq!(json["custom_tuning"]["distance"], 156.0);
+    assert_eq!(json["custom_tuning"]["omega"], 26.0);
     assert_eq!(json["reverse"], true);
     assert_eq!(json["exclusions"][0], "game.exe");
     std::fs::remove_file(p).unwrap();
@@ -231,6 +231,7 @@ fn selecting_presets_changes_motion_and_keeps_user_app_choices() {
     let mut peaks = Vec::new();
     for preset in [Preset::Default, Preset::MacosStyle, Preset::SuperSmooth] {
         s.apply_preset(preset);
+        assert!(preset.fixed());
         s.validate().unwrap();
         assert!(s.reverse && !s.horizontal && s.excluded("WORK.exe"));
         let mut engine = Engine::default();
@@ -258,9 +259,10 @@ fn selecting_presets_changes_motion_and_keeps_user_app_choices() {
 }
 
 #[test]
-fn editable_default_returns_after_fixed_presets_and_restart() {
-    let p = path("default-memory");
+fn custom_tuning_returns_after_fixed_presets_and_restart() {
+    let p = path("custom-memory");
     let mut s = Settings {
+        preset: Preset::Custom,
         distance: 240.,
         omega: 42.,
         acceleration_ms: 150.,
@@ -271,31 +273,34 @@ fn editable_default_returns_after_fixed_presets_and_restart() {
     };
     let edited = s.tuning();
     s.select_preset(Preset::MacosStyle);
-    assert_eq!(s.default_tuning, Some(edited));
+    assert_eq!(s.custom_tuning, Some(edited));
     assert!(s.preset.fixed());
+    s.select_preset(Preset::Default);
+    assert_eq!(s.tuning(), Preset::Default.tuning(), "Default is fixed");
     s.select_preset(Preset::SuperSmooth);
-    assert_eq!(s.default_tuning, Some(edited));
+    assert_eq!(s.custom_tuning, Some(edited));
     save(&p, &s).unwrap();
     let mut restored = load(&p).unwrap();
-    restored.select_preset(Preset::Default);
+    restored.select_preset(Preset::Custom);
     assert_eq!(restored.tuning(), edited);
     assert!(!restored.preset.fixed());
     restored.distance = 360.;
-    restored.select_preset(Preset::Default);
+    restored.select_preset(Preset::Custom);
     assert_eq!(
         restored.distance, 360.,
-        "reselecting Default keeps current edits"
+        "reselecting Custom keeps current edits"
     );
     restored.select_preset(Preset::MacosStyle);
-    restored.select_preset(Preset::Default);
+    restored.select_preset(Preset::Custom);
     assert_eq!(restored.distance, 360.);
     std::fs::remove_file(p).unwrap();
 }
 
 #[test]
-fn saving_fixed_tuning_normalizes_copy_and_preserves_default() {
+fn saving_fixed_tuning_normalizes_copy_and_preserves_custom() {
     let p = path("fixed-save");
     let mut s = Settings {
+        preset: Preset::Custom,
         distance: 220.,
         ..Settings::default()
     };
@@ -307,8 +312,8 @@ fn saving_fixed_tuning_normalizes_copy_and_preserves_default() {
     assert_eq!(s.distance, 500., "save must not mutate caller");
     let mut loaded = load(&p).unwrap();
     assert_eq!(loaded.tuning(), canonical);
-    assert_eq!(loaded.default_tuning, Some(edited));
-    loaded.select_preset(Preset::Default);
+    assert_eq!(loaded.custom_tuning, Some(edited));
+    loaded.select_preset(Preset::Custom);
     assert_eq!(loaded.tuning(), edited);
     std::fs::remove_file(p).unwrap();
 }
@@ -395,7 +400,42 @@ fn malformed_profiles_and_saved_default_are_rejected_without_replacement() {
     let mut s = Settings::default();
     let mut bad = s.tuning();
     bad.acceleration_max = f64::NAN;
-    s.default_tuning = Some(bad);
+    s.custom_tuning = Some(bad);
     assert!(s.validate().is_err());
+    std::fs::remove_file(p).unwrap();
+}
+
+#[test]
+fn custom_starts_from_the_active_preset_the_first_time() {
+    let mut s = Settings::default();
+    s.select_preset(Preset::MacosStyle);
+    s.select_preset(Preset::Custom);
+    assert_eq!(s.preset, Preset::Custom);
+    assert_eq!(s.tuning(), Preset::MacosStyle.tuning());
+    assert!(!s.wheel().free_spin, "Custom never adds free-spin glide");
+}
+
+#[test]
+fn legacy_edited_default_loads_as_custom_and_old_key_is_read() {
+    let p = path("legacy-default");
+    std::fs::write(
+        &p,
+        br#"{"preset":"default","distance":200,"omega":40,"exclusions":[]}"#,
+    )
+    .unwrap();
+    let s = load(&p).unwrap();
+    assert_eq!(s.preset, Preset::Custom);
+    assert_eq!((s.distance, s.omega), (200., 40.));
+    std::fs::write(
+        &p,
+        br#"{"preset":"super_smooth","default_tuning":{"distance":180,"omega":20,"acceleration_ms":70,"acceleration_max":1,"friction":4,"elastic_omega":22}}"#,
+    )
+    .unwrap();
+    let mut s = load(&p).unwrap();
+    assert_eq!(s.custom_tuning.map(|t| t.distance), Some(180.));
+    s.select_preset(Preset::Custom);
+    assert_eq!(s.distance, 180.);
+    std::fs::write(&p, br#"{"preset":"default","exclusions":[]}"#).unwrap();
+    assert_eq!(load(&p).unwrap().preset, Preset::Default);
     std::fs::remove_file(p).unwrap();
 }
