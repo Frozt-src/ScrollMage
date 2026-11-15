@@ -120,7 +120,7 @@ Candidate ZIP: `dist/ScrollMage-0.6.10-candidate-windows-x64.zip`.
 - Old 0.6.9 share ZIP SHA-256 remains `ca2adde128f90615e8ae86bdede62a617baa8dbeac0858413e15b9383fb488bf`.
 - Audit changes and follow-up documentation/packaging are kept on the audit branch. Main and the published 0.6.9 release are unchanged. Do not label this candidate production-ready based solely on automated checks.
 - The final CI outcome is recorded after the checked commit; the later release-preparation changes affect documentation and packaged release notes only.
-- [Mouse acceptance and rollback checklist](MOUSE-ACCEPTANCE-0.6.10.md) is also included in the ZIP as `MOUSE ACCEPTANCE.md`.
+- [Mouse acceptance and rollback checklist](MOUSE-ACCEPTANCE-0.7.0.md) is also included in the ZIP as `MOUSE ACCEPTANCE.md`.
 
 ## Authorized candidate publication
 

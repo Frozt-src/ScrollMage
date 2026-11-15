@@ -66,7 +66,7 @@ To smooth scrolling, Scroll Mage reads mouse wheel events through a Windows low-
 
 The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). Builds are not code-signed yet, so Windows SmartScreen may warn on first run; check your download against the SHA-256 checksum published with the release. See the [changelog](CHANGELOG.md) for changes and compatibility notes.
 
-The **0.6.10 candidate** is available as a [prerelease](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.10-candidate.1) for acceptance testing. It contains production-audit fixes and repeatable validation/packaging tools, and is not a declaration of completed production acceptance. See the [audit and release gates](source/docs/PRODUCTION-AUDIT-2026-10-21.md).
+The **0.7.0 candidate** is built from `main` for acceptance testing and has no published download yet. It replaces the scrolling engine, retunes the presets and smooths browsers by default, and is not a declaration of completed production acceptance. See the [audit and release gates](source/docs/PRODUCTION-AUDIT-2026-10-21.md) and the [mouse acceptance checklist](source/docs/MOUSE-ACCEPTANCE-0.7.0.md).
 
 ## Known limitations
 

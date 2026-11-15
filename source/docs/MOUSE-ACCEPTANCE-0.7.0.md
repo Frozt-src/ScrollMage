@@ -1,11 +1,11 @@
-# Mouse acceptance for the 0.6.10 candidate
+# Mouse acceptance for the 0.7.0 candidate
 
 Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scroll Mage supports desktop mice only; it does not smooth precision-touchpad scrolling. Automated tests do not establish physical feel or visible compatibility.
 
 ## Prepare
 
 1. Quit the existing app using **Quit Scroll Mage** in its tray menu. Closing the window only hides it. Do not run two copies together.
-2. Extract the complete candidate ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.6.10**.
+2. Extract the complete candidate ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.7.0**.
 3. Open Activity and verify smoothing is enabled. Fresh candidate defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
 
 ## Record these results
@@ -33,7 +33,7 @@ Record the mouse model, Windows build, app versions, preset, exclusions and exac
 After quitting Scroll Mage, run from the repository root in PowerShell 7:
 
 ```powershell
-./tools/Test-Candidate.ps1 -Executable ./dist/ScrollMage-0.6.10-candidate-windows-x64/ScrollMage/ScrollMage.exe
+./tools/Test-Candidate.ps1 -Executable ./dist/ScrollMage-0.7.0-candidate-windows-x64/ScrollMage/ScrollMage.exe
 ```
 
 The check launches only a copied candidate, paused, from a separate Unicode folder with spaces. It does not change your personal settings or sign-in registration. Evidence is saved in `source/target/candidate-smoke.json`. It does not replace the physical checks above.

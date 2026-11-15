@@ -27,7 +27,7 @@ For a distributable build, remove local paths from compiler diagnostics by addin
 
 ## Validation
 
-For the current local 0.6.10 candidate, run `./tools/Validate.ps1` from the repository root using PowerShell 7. Add `-Offline` to use cached dependencies, and `-DesktopInput` only on an interactive desktop where the owned-window receiver may briefly take focus. The script selects every integration test file automatically and runs hidden native tests separately. See [the production audit](source/docs/PRODUCTION-AUDIT-2026-10-21.md) for current evidence and pending release gates.
+For the current local 0.7.0 candidate, run `./tools/Validate.ps1` from the repository root using PowerShell 7. Add `-Offline` to use cached dependencies, and `-DesktopInput` only on an interactive desktop where the owned-window receiver may briefly take focus. The script selects every integration test file automatically and runs hidden native tests separately. See [the production audit](source/docs/PRODUCTION-AUDIT-2026-10-21.md) for current evidence and pending release gates.
 
 The root `rust-toolchain.toml` pins Rust 1.98.1. An already installed toolchain alias may be selected through process-scoped `RUSTUP_TOOLCHAIN` if its `rustc --version` matches that version. Do not change global Rust configuration to build this project.
 
@@ -40,7 +40,7 @@ cargo test --locked --release --target x86_64-pc-windows-msvc --test layout --te
 cargo test --locked --release --target x86_64-pc-windows-msvc --bin scrollpilot hidden_native_ -- --nocapture --test-threads=1
 ```
 
-The 0.6.10 candidate suites cover settings recovery and concurrent replacement as well as scrolling, layout and diagnostics. Keep the `hidden_native_` filter for unattended runs. The remaining native fixture uses live desktop input and verifies free-spin delivery plus click/pause braking. The published release remains 0.6.9.
+The 0.7.0 candidate suites cover settings recovery and concurrent replacement as well as scrolling, layout and diagnostics. Keep the `hidden_native_` filter for unattended runs. The remaining native fixture uses live desktop input and verifies free-spin delivery plus click/pause braking. The published release remains 0.6.9.
 
 ## Distribution
 
