@@ -62,9 +62,9 @@ Scroll Mage runs locally. Your settings stay in `settings.json` beside the execu
 
 To smooth scrolling, Scroll Mage reads mouse wheel events through a Windows low-level mouse hook and sends smoothed wheel events in their place. It runs without administrator rights and leaves apps that run as administrator alone. [SECURITY.md](../SECURITY.md) describes exactly what it touches.
 
-The app is built for 64-bit Windows. Download **0.6.9** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.6.9). Builds are not code-signed yet, so Windows SmartScreen may warn on first run; check your download against the SHA-256 checksum published with the release. See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
+The app is built for 64-bit Windows. Download **0.7.0** from [GitHub Releases](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.7.0). Builds are not code-signed yet, so Windows SmartScreen may warn on first run; check your download against the SHA-256 checksum published with the release. See the [changelog](../CHANGELOG.md) for changes and compatibility notes.
 
-The **0.7.0 candidate** is built from `main` for acceptance testing and has no published download yet. It replaces the scrolling engine, retunes the presets and smooths browsers by default, and is not a declaration of completed production acceptance. See the [audit and release gates](docs/PRODUCTION-AUDIT-2026-10-21.md) and the [mouse acceptance checklist](docs/MOUSE-ACCEPTANCE-0.7.0.md).
+Version 0.7.0 replaces the scrolling engine, adds a **Custom** preset, retunes the other presets and smooths browsers by default. See the [production audit](docs/PRODUCTION-AUDIT-2026-10-21.md) and the [mouse acceptance checklist](docs/MOUSE-ACCEPTANCE-0.7.0.md) for test evidence, hands-on checks and rollback steps.
 
 ## Known limitations
 

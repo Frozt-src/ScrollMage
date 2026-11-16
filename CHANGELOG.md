@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 candidate - 2026-11-13 (prerelease)
+## 0.7.0 - 2026-11-15
 
 Includes everything from the 0.6.10 candidate of 2026-10-21, which was published as a prerelease only.
 
@@ -33,7 +33,16 @@ Includes everything from the 0.6.10 candidate of 2026-10-21, which was published
 - Smooth sooner after the pointer moves to another window. The first wheel notch there still passes through, but it now triggers an immediate look-up of the new app instead of waiting up to a quarter of a second.
 - Re-install the mouse hook when the pointer moves but the hook has seen no mouse input, which is how a hook that Windows removed silently shows itself.
 - Deliver a wheel notch that was queued during a busy frame even when the engine cannot take it.
-- Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`. Version 0.6.9 remains the previous stable release; this candidate is for acceptance testing.
+- Full comparison and remaining production gates: `source/docs/PRODUCTION-AUDIT-2026-10-21.md`.
+
+### Download
+
+- Portable Windows x64 ZIP: `ScrollMage-0.7.0-windows-x64.zip`, with a separate `.sha256` checksum file.
+- Extract the entire folder, quit any older tray instance, and run `ScrollMage.exe`.
+- Browsers are smoothed by default; add one to **Excluded apps** to leave it alone.
+- Includes startup instructions, mouse acceptance and rollback notes, third-party licenses, a dependency inventory and per-file checksums. No personal settings are bundled. This build is unsigned.
+
+[0.7.0 release](https://github.com/Frozt-src/ScrollMage/releases/tag/v0.7.0) | [Compare with 0.6.9](https://github.com/Frozt-src/ScrollMage/compare/v0.6.9...v0.7.0)
 
 ## 0.6.9 - 2026-10-18
 
