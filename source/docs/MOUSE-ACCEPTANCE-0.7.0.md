@@ -1,12 +1,12 @@
-# Mouse acceptance for the 0.7.0 candidate
+# Mouse acceptance for the 0.7.0 release
 
 Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scroll Mage supports desktop mice only; it does not smooth precision-touchpad scrolling. Automated tests do not establish physical feel or visible compatibility.
 
 ## Prepare
 
 1. Quit the existing app using **Quit Scroll Mage** in its tray menu. Closing the window only hides it. Do not run two copies together.
-2. Extract the complete candidate ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.7.0**.
-3. Check that the Options card shows smoothing enabled. Fresh candidate defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
+2. Extract the complete release ZIP into a separate writable folder. Keep your existing installation and settings as a rollback copy. Run the extracted `ScrollMage.exe`; the UI should say **Version 0.7.0**.
+3. Check that the Options card shows smoothing enabled. Fresh 0.7.0 defaults smooth browsers; if your existing settings exclude a browser, remove it from Excluded apps before the browser tests. Existing user settings are not bundled.
 
 ## Record these results
 
@@ -24,7 +24,7 @@ Scope: Windows 11 x64, global mouse-wheel smoothing with per-app exclusions. Scr
 | Sleep/resume and an extended normal session | No stuck coast, lost input, persistent high CPU or growing memory/handle trend. Report the time and status text if input stops being accepted. | |
 | Maximize hover, resize, mixed DPI and text scaling | Snap flyout appears; text and controls remain visible and reachable. | |
 | Keyboard, Narrator and high contrast | Controls can be identified and operated; focus and state are understandable. High-contrast compatibility is still an open engineering/acceptance item, not certified by this checklist. | |
-| Tray recovery and sign-in | Tray entry survives an Explorer restart when you next perform one. If you choose to enable sign-in, verify the candidate opens after sign-in; after moving the portable folder, the stale path should no longer appear enabled. | |
+| Tray recovery and sign-in | Tray entry survives an Explorer restart when you next perform one. If you choose to enable sign-in, verify 0.7.0 opens after sign-in; after moving the portable folder, the stale path should no longer appear enabled. | |
 
 Record the mouse model, Windows build, app versions, preset, exclusions and exact failure steps with each issue. A screenshot of the Options card status helps distinguish bypass from accepted input that the receiving app renders in steps.
 
@@ -33,11 +33,11 @@ Record the mouse model, Windows build, app versions, preset, exclusions and exac
 After quitting Scroll Mage, run from the repository root in PowerShell 7:
 
 ```powershell
-./tools/Test-Candidate.ps1 -Executable ./dist/ScrollMage-0.7.0-candidate-windows-x64/ScrollMage/ScrollMage.exe
+./tools/Test-Candidate.ps1 -Executable ./dist/ScrollMage-0.7.0-windows-x64/ScrollMage/ScrollMage.exe
 ```
 
-The check launches only a copied candidate, paused, from a separate Unicode folder with spaces. It does not change your personal settings or sign-in registration. Evidence is saved in `source/target/candidate-smoke.json`. It does not replace the physical checks above.
+The check launches only a copy of the executable, paused, from a separate Unicode folder with spaces. It does not change your personal settings or sign-in registration. Evidence is saved in `source/target/candidate-smoke.json`. It does not replace the physical checks above.
 
 ## Roll back
 
-Quit the candidate from its tray menu before reopening your previous copy. Keep its original settings with that copy. If you enabled candidate sign-in registration, disable it there before moving/removing the folder, then enable it only in the version you intend to use. This is a portable manual update; no automatic updater or installer rollback is claimed.
+Quit 0.7.0 from its tray menu before reopening your previous copy. Keep its original settings with that copy. If you enabled sign-in registration in 0.7.0, disable it there before moving/removing the folder, then enable it only in the version you intend to use. This is a portable manual update; no automatic updater or installer rollback is claimed.
