@@ -1,6 +1,6 @@
 #requires -Version 7.0
 [CmdletBinding()]
-param([switch]$Offline)
+param([switch]$Offline, [switch]$Release)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $priorTarget = $env:CARGO_TARGET_DIR
@@ -13,10 +13,11 @@ try {
     $version = $Matches[1]
     [xml]$appManifest = Get-Content -LiteralPath 'source/app.manifest' -Raw
     if ($appManifest.assembly.assemblyIdentity.version -ne "$version.0") { throw 'Manifest and Cargo versions disagree.' }
-    $name = "ScrollMage-$version-candidate-windows-x64"
+    $kind = if ($Release) { 'Release' } else { 'Candidate' }
+    $name = if ($Release) { "ScrollMage-$version-windows-x64" } else { "ScrollMage-$version-candidate-windows-x64" }
     $staging = Join-Path $repo "dist/$name"
     $zip = Join-Path $repo "dist/$name.zip"
-    if ((Test-Path -LiteralPath $staging) -or (Test-Path -LiteralPath $zip)) { throw 'Candidate already exists; preserve and inspect it before creating another.' }
+    if ((Test-Path -LiteralPath $staging) -or (Test-Path -LiteralPath $zip)) { throw "$kind already exists; preserve and inspect it before creating another." }
     $env:CARGO_TARGET_DIR = Join-Path $repo 'source/target'
     $cargoHomePath = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
     $env:CARGO_ENCODED_RUSTFLAGS = @('-C','target-feature=+crt-static',"--remap-path-prefix=$repo=/build","--remap-path-prefix=$cargoHomePath=/cargo") -join [char]31
@@ -43,21 +44,30 @@ try {
     Copy-Item -LiteralPath 'source/vendor-licenses' -Destination (Join-Path $package 'vendor-licenses') -Recurse
     $utf8 = [Text.UTF8Encoding]::new($false)
     $readme = [IO.File]::ReadAllText((Join-Path $repo 'README.md')).Replace('Start Paused.lnk','Start Paused.cmd')
-    $readme = $readme -replace '(?m)^The \*\*\d+\.\d+\.\d+ candidate\*\*.*$', "This is an unsigned $version candidate. Physical-device, accessibility and visible shell acceptance remain incomplete."
+    if (-not $Release) { $readme = $readme -replace '(?m)^The \*\*\d+\.\d+\.\d+ candidate\*\*.*$', "This is an unsigned $version candidate. Physical-device, accessibility and visible shell acceptance remain incomplete." }
     [IO.File]::WriteAllText((Join-Path $package 'README.md'),$readme,$utf8)
     [IO.File]::WriteAllText((Join-Path $package 'Start Paused.cmd'),"@echo off`r`nstart `"`" /D `"%~dp0`" `"%~dp0ScrollMage.exe`" --paused`r`n",$utf8)
+    $heading = if ($Release) { "SCROLL MAGE $version - WINDOWS X64" } else { "SCROLL MAGE $version CANDIDATE - WINDOWS X64" }
+    $status = if ($Release) { @"
+No personal settings are bundled. This release is unsigned, so Windows SmartScreen
+may warn on first run; check the ZIP against its published SHA-256 checksum.
+Keep the included license notices with redistributed copies. See README.md and
+MOUSE ACCEPTANCE.md for hands-on checks and rollback instructions.
+"@ } else { @"
+No personal settings are bundled. This candidate is unsigned and is not a claim
+of completed physical-mouse, app-compatibility, accessibility or Snap acceptance.
+Keep the included license notices with redistributed copies. See README.md and
+MOUSE ACCEPTANCE.md for the remaining hands-on checks and rollback instructions.
+"@ }
     $instructions = @"
-SCROLL MAGE $version CANDIDATE - WINDOWS X64
+$heading
 
 Extract this entire folder to a writable location. Quit any existing Scroll Mage
 instance from the tray menu, then run ScrollMage.exe. Select Super smooth for
 flick-and-coast scrolling. Reverse, click, or press Alt+P to stop coasting.
 Browsers are smoothed by default; add one to Excluded apps to leave it alone.
 
-No personal settings are bundled. This candidate is unsigned and is not a claim
-of completed physical-mouse, app-compatibility, accessibility or Snap acceptance.
-Keep the included license notices with redistributed copies. See README.md and
-MOUSE ACCEPTANCE.md for the remaining hands-on checks and rollback instructions.
+$status
 "@
     [IO.File]::WriteAllText((Join-Path $package 'START HERE.txt'),$instructions+"`n",$utf8)
     $inventory = [ordered]@{version=$version;target='x86_64-pc-windows-msvc';lock_sha256=(Get-FileHash -LiteralPath 'source/Cargo.lock').Hash.ToLowerInvariant();dependencies=$dependencies}
@@ -70,7 +80,7 @@ MOUSE ACCEPTANCE.md for the remaining hands-on checks and rollback instructions.
     & (Join-Path $PSScriptRoot 'Verify-Package.ps1') -Path $zip -ExpectedExecutableHash $exeHash
     $zipHash = (Get-FileHash -LiteralPath $zip).Hash.ToLowerInvariant()
     [IO.File]::WriteAllText(($zip+'.sha256'),$zipHash+'  '+[IO.Path]::GetFileName($zip)+"`n",$utf8)
-    Write-Output "Candidate: $zip"
+    Write-Output "$kind`: $zip"
     Write-Output "SHA256: $zipHash"
 } finally {
     $env:CARGO_TARGET_DIR = $priorTarget
